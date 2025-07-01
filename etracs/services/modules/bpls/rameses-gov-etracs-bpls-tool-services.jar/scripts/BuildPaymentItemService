@@ -1,0 +1,126 @@
+import com.rameses.annotations.*; 
+
+class BuildPaymentItemService {
+	
+	@Env 
+	def env; 
+
+	@DataContext( dynamic=true )
+	def dynaEm;
+
+	@Service( dynamic=true ) 
+	def dynaSvc; 
+
+
+	@ProxyMethod 
+	public def getPayments( param ) {
+		if ( !param.applicationid ) 
+			throw new Exception('applicationid parameter is required in BuildPaymentItemService.getPayments'); 
+
+		def em = dynaEm.lookup('business_payment');
+		def payments = em.getApplicationPayments( param ); 
+		payments.each{ pmt-> 
+			if ( pmt.reftype == 'cashreceipt_group' ) {
+				def receipts = dynaEm.lookup( pmt.reftype ).getReceipts([ objid: pmt.objid ]); 
+				if ( receipts ) {
+					pmt.refno = receipts.collect{ it.receiptno }.findAll{( it )}.sort{ it }.join(","); 
+				}
+			}
+		} 
+		return payments; 
+	}
+
+	@ProxyMethod 
+	public def getPaymentItems( param ) {
+		if ( !param.paymentid ) 
+			throw new Exception('paymentid parameter is required in BuildPaymentItemService.getPaymentItems'); 
+
+		def em = dynaEm.lookup('business_payment');
+		return em.getItems( param ); 
+	}	
+
+	@ProxyMethod 
+	public def getReceiptItems( param ) {
+		if ( !param.paymentid ) 
+			throw new Exception('paymentid parameter is required in BuildPaymentItemService.getPaymentReceiptItems'); 
+
+		def em = dynaEm.lookup('bpls_tool_ledger');
+		def pmt = em.findPayment([ objid: param.paymentid ]);
+		if ( !pmt ) throw new Exception('Business payment record not found'); 
+		if ( pmt.voided == 1 ) throw new Exception('Business payment record is voided'); 
+
+		def items = em.getReceiptItems( param ); 
+		if ( !items ) items = em.getGroupReceiptItems( param ); 
+		
+		items.each{
+			it.paymentitemid = 'BPMTI'+ new java.rmi.server.UID().toString();
+		}
+
+		return items;  
+	} 
+
+	@ProxyMethod 
+	public def getReceivables( param ) {
+		if ( !param.applicationid ) 
+			throw new Exception('applicationid parameter is required in BuildPaymentItemService.getReceivables'); 
+		if ( !param.accountid ) 
+			throw new Exception('accountid parameter is required in BuildPaymentItemService.getReceivables'); 
+
+		def em = dynaEm.lookup('bpls_tool_ledger');
+
+		param.filters = ''' r.account_objid = $P{accountid} ''';
+		def items = em.getReceivables( param );
+		if ( !items ) {
+			param.filters = '1=1'; 
+			items = em.getReceivables( param ); 
+		} 
+
+		return items;  
+	} 
+
+	@ProxyMethod 
+	public void post( param ) {
+		if ( !param.items ) 
+			throw new Exception('items parameter is required in BuildPaymentItemService.post'); 
+
+		def paymentid = param.items.first()?.parentid; 
+
+		def em = dynaEm.lookup('bpls_tool_ledger');
+		def pmt = em.findPayment([ objid: paymentid ]); 
+		if ( !pmt ) throw new Exception("'"+ paymentid +"' business payment record not found"); 
+		if ( pmt.voided == 1 ) throw new Exception("Business payment record is already voided"); 
+
+		def pmti_em = dynaEm.lookup('business_payment_item');
+		if ( pmti_em.find([ parentid: paymentid ]).first()) 
+			throw new Exception("Business payment record already contains items"); 
+
+		def receivables = []; 
+		param.items.findAll{( it.receivableid )}.each{
+			def rec = em.findReceivable([ objid: it.receivableid ]); 
+			if ( !rec ) {
+				def msg = "'"+ it.receivableid +"' receivable record not found"; 
+				throw new Exception( msg );
+			}
+
+			rec.amtpaid += it.amount; 
+			receivables << rec; 
+		}
+
+		param.items.each{
+			if ( !it.discount ) it.discount = 0.0;
+			if ( !it.surcharge ) it.surcharge = 0.0;
+			if ( !it.interest ) it.interest = 0.0;
+			if ( !it.sortorder ) it.sortorder = 0;
+			if ( !it.partial ) it.partial = 0;
+			if ( !it.qtr ) it.qtr = 0;
+
+			pmti_em.create( it ); 
+		}
+
+		// def rec_em = dynaEm.lookup('business_receivable');
+		// receivables.each{
+		// 	rec_em.find([ objid: it.objid ]).update([ amtpaid: it.amtpaid ]); 
+		// } 
+		// receivables.clear(); 
+	} 
+} 

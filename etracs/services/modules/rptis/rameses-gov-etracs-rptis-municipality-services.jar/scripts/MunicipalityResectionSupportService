@@ -1,0 +1,19 @@
+import com.rameses.annotations.*
+import com.rameses.common.*;
+import java.util.concurrent.*;
+
+class MunicipalityResectionSupportService
+{
+    /* intercepted by Sync Facility */
+    @ProxyMethod
+    public def resendToProvince( resection ) {
+        return resection;
+    }
+
+    @ProxyMethod
+    public def resendRequirements( resection ){
+        return resection
+    }
+
+}
+

@@ -1,0 +1,189 @@
+import com.rameses.annotations.*;
+
+class EPaymentRepostService   {
+
+    @Service( dynamic=true )
+    def dynaSvc;
+
+    @DataContext( dynamic=true )
+    def dynaEm;
+
+    @DataContext("epayment_plugin")
+    def pluginEm;
+
+    @DataContext("eor")
+    def eorEm; 
+
+    @DataContext("eor_paymentorder_paid")
+    def poPaidEm; 
+
+
+    @ProxyMethod
+    public def postPayment( param ) { 
+        if (!(param.objid || param.receiptno || param.paymentrefid)) {
+            throw new Exception('param.receiptno   parameter is required');
+        }
+
+        def eor = null; 
+        if ( param.objid ) {
+            eor = eorEm.find([ objid: param.objid ]).first();
+        } 
+        else if ( param.receiptno ) { 
+            eor = eorEm.find([ receiptno: param.receiptno ]).first();
+        }
+        else if ( param.paymentrefid ) { 
+            eor = eorEm.find([ paymentrefid: param.paymentrefid ]).first();
+        }
+
+        if ( !eor ) throw new Exception("EOR record not found"); 
+
+        def po = poPaidEm.find([ objid: eor.paymentrefid ]).first(); 
+        if ( !po ) throw new Exception("Payment Order record not found"); 
+
+        def pluginSvc = findPluginSvc( eor.txntype ); 
+        if ( !pluginSvc ) throw new Exception("'"+ eor.txntype +"'  epayment_plugin record not found"); 
+
+        eor.receiptid = eor.objid; 
+
+        po.partnerid = eor.partnerid; 
+        po.tracedate = eor.tracedate; 
+        po.traceid = eor.traceid;
+        po.billdate = (po.tracedate ? po.tracedate : po.txndate);
+        po.allow_rebuild = true;
+
+        def bill = pluginSvc.verifyPayment( po );
+        if ( !bill ) bill = [:];
+
+        boolean allow_rebuild_items = param.allow_rebuild_items.toString().matches('true|1'); 
+        boolean allow_rebuild_shares = param.allow_rebuild_shares.toString().matches('true|1'); 
+
+        if ( allow_rebuild_items && bill.items ) {
+            def eori = dynaEm.lookup('eor_item'); 
+            eori.find([ parentid: eor.objid ]).delete(); 
+
+            bill.items.each{ 
+                it.parentid = eor.objid; 
+                eori.create( it ); 
+            }
+        }
+
+        pluginSvc.postPayment( eor, bill ); 
+
+        if ( allow_rebuild_shares && bill.sharing.toString().matches('true|1')) {
+            rebuildShare( eor ); 
+        } 
+
+        return [objid: eor.objid, paymentrefid: eor.paymentrefid, status: 'success'];
+    }
+
+    @ProxyMethod
+    public def rebuildShare( param ) { 
+        if ( !param.objid ) 
+            throw new Exception('param.objid  parameter is required'); 
+
+        def eor = eorEm.find([ objid: param.objid ]).select('objid,txntype,receiptdate').first(); 
+        if ( !eor ) throw new Exception("'"+ param.objid +"'  eor record not found"); 
+
+        def pluginSvc = findPluginSvc( eor.txntype ); 
+        if ( !pluginSvc ) throw new Exception("'"+ eor.txntype +"'  epayment_plugin record not found"); 
+
+        eor.receiptid = eor.objid; 
+
+        def em_eor_item = dynaEm.lookup('eor_item').find([ parentid: eor.objid ]); 
+        eor.items = em_eor_item.select('objid,parentid,amount,item.*').list(); 
+        eor.items.each{ 
+            it.receiptid = it.parentid; 
+        } 
+
+        def shares = pluginSvc.generateShares( eor ); 
+        if ( shares ) { 
+            def findby = [ parentid: eor.receiptid ]; 
+            em_share.find( findby ).delete(); 
+
+            shares.each{ 
+                it.parentid = eor.receiptid; 
+                em_share.create( it ); 
+            } 
+
+            shares = em_share.find( findby ).list(); 
+        } 
+        return shares; 
+    } 
+
+    @ProxyMethod
+    public def updateCloudPayment( param ) {
+        if (!(param.objid || param.receiptno || param.paymentrefid)) {
+            throw new Exception('param.receiptno  parameter is required');
+        }
+
+        def eor = null; 
+        if ( param.objid ) {
+            eor = eorEm.find([ objid: param.objid ]).first();
+        } 
+        else if ( param.receiptno ) { 
+            eor = eorEm.find([ receiptno: param.receiptno ]).first();
+        }
+        else if ( param.paymentrefid ) { 
+            eor = eorEm.find([ paymentrefid: param.paymentrefid ]).first();
+        }
+
+        if ( !eor ) throw new Exception("EOR record not found"); 
+
+        def po = poPaidEm.find([ objid: eor.paymentrefid ]).first(); 
+        if ( !po ) throw new Exception("Payment Order record not found"); 
+
+        def mm = [:];
+        mm.receiptid = eor.objid;
+        mm.receiptno = eor.receiptno;
+        mm.receiptdate = eor.receiptdate; 
+        mm.paymentrefid = eor.paymentrefid;  
+
+        def cloudSvc = dynaSvc.lookup('epayment/CloudPaymentService', 'cloud-server'); 
+        cloudSvc.updatePaymentReceipt( mm );
+        return mm; 
+    }
+
+    @ProxyMethod
+    public def emailPayment( param ) {
+        if (!(param.objid || param.receiptno || param.paymentrefid)) {
+            throw new Exception('param.receiptno  parameter is required');
+        }
+
+        def eor = null; 
+        if ( param.objid ) {
+            eor = eorEm.find([ objid: param.objid ]).first();
+        } 
+        else if ( param.receiptno ) { 
+            eor = eorEm.find([ receiptno: param.receiptno ]).first();
+        }
+        else if ( param.paymentrefid ) { 
+            eor = eorEm.find([ paymentrefid: param.paymentrefid ]).first();
+        }
+
+        if ( !eor ) throw new Exception("EOR record not found"); 
+
+        def po = poPaidEm.find([ objid: eor.paymentrefid ]).first(); 
+        if ( !po ) throw new Exception("Payment Order record not found"); 
+
+        def mm = [:];
+        mm.reportid = "eor";
+        mm.refid = eor.objid;
+
+        def emailQueueSvc = dynaSvc.lookup('JasperEmailQueueService'); 
+        emailQueueSvc.send( mm );
+        return mm;
+    } 
+    
+
+    def findPluginSvc( txntype ) {
+        def p = pluginEm.find( [objid: txntype ] ).first();
+        if ( !p ) throw new Exception("Plugin " + txntype + " not found. Please register in epayment_plugin");
+
+        def serviceName = p.servicename;
+        def conn = p.connection;
+        def t = dynaSvc.lookup(serviceName, conn );
+        if ( !t ) throw new Exception(serviceName + " not found for "+handler +" @connection "+conn);
+
+        return t;
+    }
+}

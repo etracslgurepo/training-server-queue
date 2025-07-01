@@ -1,0 +1,185 @@
+import com.rameses.annotations.*;
+import com.rameses.util.*;
+
+class OnlineBusinessBillingService {
+
+	@DataContext( dynamic=true )
+	def dynaEm; 
+
+	@Service( dynamic=true )
+	def dynaSvc; 
+
+	@Service("BusinessCashReceiptService")
+	def svc;
+
+	@Service("DateService")
+	def dateSvc;
+
+	@DataContext("business_application")
+	def appEm;
+
+	@Service("PersistenceService")
+	def persistenceSvc;	
+
+	@Service('BusinessPostPaymentService')
+	def postPaymentSvc;
+
+	@Service("NumberService")
+	def numSvc;
+
+	@Service('')
+	def sharingSvc; 
+
+	@ActiveDB('online_bpls') 
+	def online_bpls;
+
+	private def generateBilling( def o ) { 
+		o.refno = (o.refno ? o.refno : o.appno); 
+
+		def app = appEm.find([ appno: o.refno ]).first();
+		if ( !app ) {
+			def findparam = [ bin: o.refno ]; 
+
+			app = online_bpls.findBIN( findparam ); 
+			if ( !app ) {
+				throw new Exception("Cannot find business application " + o.refno);
+			}
+
+			app = online_bpls.findUnpaidAppByBIN( findparam ); 
+			if ( !app ) {
+				throw new Exception("No unpaid items found");
+			}
+
+			app = appEm.find([ objid: app.objid.toString() ]).first();
+		}
+
+		if ( !app.state.toString().toUpperCase().matches('PAYMENT|RELEASE|COMPLETED')) {
+			throw new Exception("Application is not in payment state");
+		}
+
+		if ( o.checksum ) {
+			def oapp = dynaEm.lookup('online_bpls').findBusinessApp([ objid: app.objid ]);
+			if ( !verifyCheckSum( app.objid, app.appno, oapp.contact?.email.toString(), o.checksum )) {
+				throw new Exception("Invalid checksum value for this transaction");
+			}
+		}
+
+		// This is to inform the BillingService not to refetch the app record
+		// because all information needed for the billing is completely loaded
+		app._loaded = true; 
+
+		def bill_param = [ app: app,  applicationid: app.objid ]; 
+    	bill_param.billdate = ( o.billdate ? o.billdate : dateSvc.getBasicServerDate()); 
+    	bill_param.payment = [ option: 'FULLYEAR', year: app.appyear ]; 
+        if ( o.qtr ) {
+        	bill_param.payment.option = 'FULLQTR'; 
+        	bill_param.payment.qtr = o.qtr.toInteger(); 
+        } 
+
+		def z = svc.getBillingForPayment( bill_param ); 
+
+		z.app = app;
+		z.payment = bill_param.payment;
+        z.amount = numSvc.round( z.totals.total );
+		return z;
+	}
+
+	@ProxyMethod
+	public def getBilling( def o ) {
+		def z = generateBilling( o );
+
+		def p = [:];
+		p.info = [
+			ownername: z.app.ownername, 
+			tradename: z.app.tradename, 
+			address: z.app.businessaddress, 
+			appno: z.app.appno, 
+			bin: z.app.business.bin, 
+			appdate:z.app.dtfiled, 
+			apptype: z.app.apptype,
+			expirydate:z.expirydate, 
+			email: z.app.business.email,
+			mobileno: z.app.business.mobileno,
+			amount: z.amount,
+		];
+		if( o.showdetails ) {
+			p.info.items = z.taxfees.collect{[ 
+					lobname: it.lob.name, 
+					account:it.account?.title, 
+					amount: numSvc.round(it.amtdue), 
+					discount:numSvc.round(it.discount), 
+					surcharge:numSvc.round(it.surcharge),
+					interest:numSvc.round(it.interest),
+					total: numSvc.round(it.total) 
+			]};
+		}
+		p.amount = z.amount;
+		return p;
+	}
+
+	@ProxyMethod
+	public def verifyPayment(  def o ) {
+		def r = [:]
+		r.appno = o.refno;
+		r.billdate = o.billdate; 
+		if ( o.info?.qtr ) r.qtr = o.info.qtr; 
+
+		def z = generateBilling( r );
+		if ( o.amount != z.amount ) 
+			throw new Exception('Bill amount has changed from '+ o.amount +' to '+ z.amount); 
+
+		o.businessid = z.app.business.objid;
+		o.applicationid = z.app.objid;
+		o.appyear = z.app.appyear; 
+		o.taxfees = z.taxfees;
+		o.expirydate = z.expirydate; 
+		o.items = z.items; 
+		o.sharing = true; 
+		return o; 
+	}
+
+	@ProxyMethod
+	public void postPayment(  def eor, def bill ) {
+		bill.reftype = 'eor';
+		bill.receiptno = eor.receiptno;
+		bill.receiptdate = eor.receiptdate;
+		postPaymentSvc.postPayment( bill ); 
+	}
+
+    @ProxyMethod
+	public def getEmailAttachments( eor ) {
+        return [];
+    }
+
+    @ProxyMethod
+    public def generateShares( param ) { 
+    	def shareSvc = dynaSvc.lookup('RevenueSharingService', 'treasury'); 
+        return shareSvc.execute( param ); 
+    } 
+
+
+	@ProxyMethod
+	public boolean verifyCheckSum( appid, appno, email, checksum ) {
+		if ( checksum.toString() == '0' ) {
+			// do nothing 
+			return true;
+		}
+
+		def newchecksum = buildCheckSum( appid, appno, email ); 
+		return ( newchecksum == checksum ); 
+	}
+
+	@ProxyMethod(local=true)
+	public def buildCheckSum( appid, appno, email ) {
+		if ( !appid ) 
+			throw new Exception("appid argument is required in buildCheckSum");
+		if ( !appno ) 
+			throw new Exception("appid argument is required in buildCheckSum");
+		if ( !email ) 
+			throw new Exception("email argument is required in buildCheckSum");
+
+		def buff = new StringBuilder();
+		buff.append( appid ).append( email); 
+		return com.rameses.util.Encoder.MD5.encode( buff.toString(), appno );
+	} 
+}

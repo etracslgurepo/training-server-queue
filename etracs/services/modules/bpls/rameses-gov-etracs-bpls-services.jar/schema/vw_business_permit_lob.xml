@@ -1,0 +1,18 @@
+<schema>
+	
+	<element tablename="vw_business_permit_lob">
+		<field name="objid" primary="true"/>
+		<field name="parentid" />
+		<field name="lobid" />
+		<field name="name" />
+		<field name="txndate" />
+
+		<field name="classification_objid" />
+		<field name="classification_name" />
+
+		<field name="psicid" />
+		<field name="psic_code" />
+		<field name="psic_description" />
+	</element>	
+
+</schema>

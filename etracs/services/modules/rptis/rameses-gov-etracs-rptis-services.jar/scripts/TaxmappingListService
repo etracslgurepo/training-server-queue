@@ -1,0 +1,41 @@
+import com.rameses.annotations.*;
+import com.rameses.common.*;
+import com.rameses.services.extended.*;
+
+class TaxmappingListService
+{
+	@ActiveDB('taxmapping_list')
+	def em
+
+
+	@ProxyMethod
+	public def getList( params ) {
+		buildFilter(params)
+		return em.getList(params);
+	}
+
+	@ProxyMethod
+	public def getFaasList(data) {
+		def params = data.params
+		buildFilter(params)
+		params.putAll(data.item)
+		return em.getFaasList(params)
+	}
+
+
+	@ProxyMethod
+	public def getRevisionYears() {
+		return em.getRevisionYears().ry;
+	}
+
+	void buildFilter(params) {
+		if (!params.state) params.state = '%'
+
+		params.filter = '';
+		if (params.recordtype) {
+			params.txntypeid = 'GR'
+			def operator = 'GR'.equalsIgnoreCase(params.recordtype) ? ' = ' : ' <> '
+			params.filter = ' AND f.txntype_objid ' + operator + ' $P{txntypeid}'
+		}
+	}
+}

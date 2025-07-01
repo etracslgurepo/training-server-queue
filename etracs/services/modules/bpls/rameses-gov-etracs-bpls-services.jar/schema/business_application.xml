@@ -1,0 +1,43 @@
+<schema>
+	
+	<element tablename="business_application">
+		<field name="objid" primary="true"/>
+		<field name="business_objid" required="true"/>
+		<field name="appno" required="true" caption="AppNo" searchable="true"/>
+		<field name="state" caption="State" />
+		<field name="apptype" required="true" caption="AppType"/>
+		<field name="appyear" required="true" caption="AppYear"/>
+		<field name="appqtr" />
+		<field name="yearstarted" caption="YearStarted" />
+		<field name="dtfiled" required="true" caption="DateFiled"/>
+		<field name="dtreleased" />
+		<field name="txnmode" required="true" caption="TxnMode"/>
+		<field name="txndate" required="true" caption="TxnDate"/>
+		<field name="createdby_objid" required="true"/>
+		<field name="createdby_name" required="true" caption="CreatedBy"/>
+		<field name="assessor_objid" />
+		<field name="assessor_name" caption="Assessor"/>
+		<field name="assessor_title" />
+		<field name="approver_objid" />
+		<field name="approver_name" caption="Approver"/>
+		<field name="approver_title" />
+		<field name="totals_tax"  required="true"/>
+		<field name="totals_regfee"  required="true"/>
+		<field name="totals_othercharge"  required="true"/>
+		<field name="totals_total"  required="true"/>
+		<field name="remarks"/>
+		<field name="permit_objid"/>
+		<field name="ownername" required="true" caption="OwnerName"/>
+		<field name="owneraddress" required="true" caption="OwnerAddress"/>
+		<field name="tradename" required="true" caption="TradeName" searchable="true"/>
+		<field name="businessaddress" required="true" caption="BusinessAddress"/>
+		<field name="parentapplicationid" />
+		<field name="nextbilldate" />
+
+		<complex name="business" ref="business" jointype="many-to-one" required="false" 
+			includefields="bin,owner.*,phoneno,mobileno,email,orgtype,officetype,permittype,purpose,yearstarted">
+			<key field="business_objid" target="objid" />
+		</complex>	
+	</element>	
+
+</schema>

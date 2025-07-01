@@ -1,0 +1,15 @@
+<app>
+<env>
+bpls.filemgmt.connection=bpls-fileserver-pub
+bpls.app.host=${pub_app_server_ip}:18070
+bpls.app.context=etracs25
+</env>
+<modules>
+   <module version="2.35" file="bpls/rameses-gov-etracs-bpls.jar"  />
+   <module version="2.07" file="bpls/rameses-gov-etracs-bpls-reports.jar"  />
+   <module version="2.04" file="bpls/rameses-gov-etracs-bpls-offices.jar"  />
+   <module version="2.04" file="bpls/rameses-gov-etracs-bpls-ceo.jar"  />
+   <module version="2.13" file="bpls/rameses-gov-etracs-bpls-online.jar"  />
+   <module version="2.05" file="bpls/rameses-gov-etracs-bpls-fire.jar"  />
+</modules>
+</app>

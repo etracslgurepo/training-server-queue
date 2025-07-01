@@ -1,0 +1,11 @@
+import com.rameses.annotations.*;
+
+class OnlineBusinessMailService {
+
+	@ProxyMethod
+	public void emailTrackingNo( data ) {
+		// see interceptors for implementation
+	}
+
+	
+}

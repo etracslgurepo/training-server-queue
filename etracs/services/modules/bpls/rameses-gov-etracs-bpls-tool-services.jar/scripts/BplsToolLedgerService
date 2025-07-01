@@ -1,0 +1,33 @@
+import com.rameses.annotations.*; 
+
+class BplsToolLedgerService {
+	
+	@Env 
+	def env; 
+
+	@DataContext( dynamic=true )
+	def dynaEm;
+
+	@Service( dynamic=true ) 
+	def dynaSvc; 
+
+	@Service('DateService') 
+	def dateSvc; 
+
+
+	@ProxyMethod 
+	public def repostPayment( param ) {
+		if ( !param.objid ) throw new Exception('objid parameter is required in repostPayment'); 
+
+		def legerEm = dynaEm.lookup('bpls_tool_ledger'); 
+		def pmt = legerEm.findPayment([ objid: param.objid ]); 
+		if ( !pmt?.objid ) throw new Exception('Business payment record not found'); 
+
+		if ( pmt.voided.toString() == '1' ) 
+			throw new Exception('Cannot process transaction due to a voided receipt'); 
+
+		def items = legerEm.getPaymentItems([ paymentid: param.objid ]); 
+
+		return adb.findApp( params ); 
+	}
+}

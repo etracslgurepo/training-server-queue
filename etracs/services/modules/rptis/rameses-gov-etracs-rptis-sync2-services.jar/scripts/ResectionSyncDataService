@@ -1,0 +1,219 @@
+import com.rameses.annotations.*
+import com.rameses.util.*
+import com.rameses.services.extended.*
+
+class ResectionSyncDataService
+{
+	@Env
+	def env 
+
+	@Service('DateService')
+    def dtSvc
+
+	@Service('RPTMainSyncDataService')
+	def syncSvc 
+
+    @Service('RPTSyncDataService')
+    def rptSync
+
+    @Service('RPTSyncDataSupport')
+    def support
+
+    @Service('ResectionService')
+    def svc
+
+	@Service('ResectionSupportService')
+    def supportSvc
+
+	@Service('ResectionWorkflowService')
+	def workflowSvc
+
+	@Service('FAASService')
+	def faasSvc
+
+	@Service('FAASSyncDataService')
+	def faasSyncSvc
+
+	
+    @DataContext('resection')
+    def em_resection
+
+    @DataContext('resection_item')
+    def em_resection_item
+
+    @DataContext('resection_task')
+    def em_task
+
+    def TXNTYPE_RS = 'RS';
+
+
+    def getActions(){
+		return  [
+	    	'RESECTION-FORAPPROVAL': [send: sendForApproval, receive: postForApproval, schedule: scheduleSubmitToProvince],
+	    	'RESECTION-REQUIREMENTS': [send: {}, receive: {}, schedule: scheduleRequirements],
+	    	'RESECTION-FAAS-APPROVED': [send: sendApprovedFaas, receive: postApprovedFaas, schedule: {}],
+	    	'RESECTION-APPROVED': [send: sendApprovedResection, receive: postApprovedResection, schedule: scheduleResectionApproval],
+	    	'RESECTION-DISAPPROVAL': [send: sendDisapprovedResection, receive: postDisapprovedResection, schedule: scheduleResectionDisapproval],
+	    ]
+	}
+
+
+	/*---------------------------------------------------------
+	*
+	* SCHEDULING SYNC SUPPORT 
+	*
+	---------------------------------------------------------*/
+	@ProxyMethod
+	public void schedule(data) {
+		def action= getActions()[data.action]
+		if (!action) throw new Exception('Scheduler not found for action ' + data.action)
+
+		def resection = em_resection.find([objid: data.objid]).first()
+		data.remote = rptSync.getRemoteOrg(resection)
+        def syncdata = syncSvc.create(data)
+
+		action.schedule(syncdata, resection)
+	}
+
+	def createItem(item, syncdata, action, async) {
+		return [
+			refid: item.objid, 
+			reftype: syncdata.reftype, 
+			refno: syncdata.refno, 
+			async: (async == null ? syncdata.async : async),
+			action: (action ? action : syncdata.action),
+		]
+	}
+
+	void createSyncItem(entity, syncdata, action) {
+		createSyncItem(entity, syncdata, action, null)
+	}
+
+	void createSyncItem(entity, syncdata, action, async) {
+		def item = createItem(entity, syncdata, action, async)
+        syncSvc.createItem(syncdata, item)
+	}
+
+
+	def scheduleSubmitToProvince = {syncdata, resection ->
+		syncdata.info = syncdata.info ? syncdata.info : [:]
+    	syncdata.info.txntype = TXNTYPE_RS
+
+        em_resection_item.find([parent_objid: resection.objid]).list().each {
+        	faasSyncSvc.scheduleFaasData(syncdata, [objid: it.newfaas.objid])
+        }
+
+		createSyncItem(resection, syncdata, 'RESECTION-FORAPPROVAL')
+        rptSync.scheduleExaminations(syncdata, resection.objid)
+    	rptSync.scheduleRequirements(syncdata, resection.objid)
+	}
+
+	def scheduleRequirements = {syncdata, resection ->
+		syncdata.info = syncdata.info ? syncdata.info : [:]
+    	syncdata.info.txntype = TXNTYPE_RS
+    	rptSync.scheduleRequirements(syncdata, resection.objid)
+	}
+
+
+	def scheduleResectionApproval = {syncdata, resection ->
+        em_resection_item.find([parent_objid: resection.objid]).list().each {
+        	def faas = [objid: it.newfaas.objid]
+        	createSyncItem(faas, syncdata, 'RESECTION-FAAS-APPROVED')
+        }
+		createSyncItem(resection, syncdata, 'RESECTION-APPROVED')
+        rptSync.scheduleExaminations(syncdata, resection.objid)
+	}
+
+	def scheduleResectionDisapproval = {syncdata, resection ->
+		createSyncItem(resection, syncdata, 'RESECTION-DISAPPROVAL')
+	}
+
+	
+    /*---------------------------------------------------------
+	* SEND/RECEIVE HANDLERS 
+	---------------------------------------------------------*/
+	@ProxyMethod
+	public void send(syncdata) {
+		rptSync.send(syncdata, getActions())
+	}
+
+	@ProxyMethod
+	public void receive(syncdata) {
+		rptSync.receive(syncdata, getActions())
+	}
+
+
+	/*---------------------------------------------------------
+	* SUPPORT METHODS
+	---------------------------------------------------------*/
+	def sendForApproval = {syncdata ->
+		def resection = [objid: syncdata.refid]
+		return supportSvc.buildData(resection)
+	}
+
+	def postForApproval = {syncdata ->
+		def resection = syncdata.data 
+		supportSvc.postData(resection)
+		startWorkflow(syncdata, resection)
+	}
+
+	def sendApprovedFaas = {syncdata ->
+		return getApprovedFaas(syncdata)
+	}
+
+	def getApprovedFaas = {syncdata ->
+		def faas = [objid: syncdata.refid]
+		return supportSvc.getApprovedFaas(faas)
+	}
+
+	def postApprovedFaas = {syncdata ->
+		def faas = syncdata.data 
+		supportSvc.postApprovedFaas(faas)
+
+	}
+
+	def sendApprovedResection = {syncdata ->
+		def resection = [objid: syncdata.refid]
+		return supportSvc.buildData(resection)
+	}
+
+	def postApprovedResection = {syncdata ->
+		def resection = syncdata.data 
+		supportSvc.postApprovedResection(resection)
+
+	}
+	
+	def sendDisapprovedResection = {syncdata ->
+		return [objid: syncdata.refid]
+	}
+
+	def postDisapprovedResection = {syncdata ->
+		def resection = syncdata.data 
+		supportSvc.postDisapprovedResection(resection)
+
+	}
+
+
+	void startWorkflow(syncdata, resection){
+		def currtask = em_task.select('objid').where('refid = :objid and enddate is null', resection).first()
+		if (!currtask) {
+			def tasks = workflowSvc.start([refid:resection.objid, data:resection])
+			if (tasks){
+				resection.taskid = tasks[0].objid
+			}
+			notifyGroup(syncdata, resection)
+		}
+	}
+
+	void notifyGroup(syncdata, resection){
+        def param = [:]
+        param.objid = resection.objid 
+        param.sender = syncdata.sender
+        param.recipientid = 'assign-receiver'
+        param.filetype = 'Resection'
+        param.msg = 'Resection No. ' + resection.txnno + ' (assign-receiver) submitted by ' + syncdata.sender.name + '.'
+        param.taskid = resection.taskid 
+        support.notifyGroup(param)
+	}
+}
+ 

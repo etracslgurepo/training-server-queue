@@ -1,0 +1,43 @@
+import com.rameses.annotations.*;
+
+import groovy.text.*;
+import java.util.regex.*;
+import com.rameses.osiris2.reports.*;
+import com.rameses.osiris3.sql.*;
+import groovy.lang.GroovyShell;
+import groovy.lang.Script;
+import org.codehaus.groovy.runtime.InvokerHelper;
+import com.rameses.util.*;
+
+class SysMessageQueueService {
+	
+	@DataContext("sys_message_queue")
+	def msgQueueEm;
+
+	@XConnection(dynamic=true)
+	def dyna_xconn;
+
+	@ProxyMethod
+	public void sendToEmail() {
+		def list = msgQueueEm.where("state = 0 AND NOT(email IS NULL)").orderBy("dtsent").list(0, 25); 
+		if ( !list ) return; 
+
+		String DEFAULT_CONNECTION = "primary-email-server"; 
+		list.each { o->
+			try { 
+				def mailConn = dyna_xconn.lookup( o.connection ? o.connection : DEFAULT_CONNECTION ); 
+				mailConn.send([ to: o.email, subject: o.subject, message: o.message ]); 
+				msgQueueEm.find([ objid: o.objid ]).delete(); 
+			} 
+			catch (exx) { 
+				def e = ExceptionManager.instance.getOriginal( exx ); 
+				msgQueueEm.find([ objid: o.objid ]).update([ state:2, errmsg: e?.message ]); 
+			} 
+		};
+		list.clear(); 	
+	}
+
+
+
+}
+

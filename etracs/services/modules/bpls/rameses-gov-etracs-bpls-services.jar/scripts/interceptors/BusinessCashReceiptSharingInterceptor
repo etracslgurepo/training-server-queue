@@ -1,0 +1,36 @@
+import com.rameses.annotations.*;
+
+class BusinessCashReceiptSharingInterceptor {
+
+	@DataContext( dynamic=true )
+	def dynaEm;
+
+	@After( pattern="RevenueSharingService.getFacts" )
+	void afterGetFacts( evt ) {
+		def rct = evt.args[0]; 
+		if ( rct == null ) return; 
+
+		def facts = evt.result; 
+
+		def coltype_handler = rct.collectiontype?.handler.toString();
+		if ( coltype_handler == 'bpls' ) {
+			buildFacts( facts, rct ); 
+		}
+	}
+
+
+	void buildFacts( facts, rct ) { 
+		def businessid = rct.businessid; 
+		if ( !businessid ) return; 
+
+		def addr = dynaEm.lookup('business').findCurrentAddress([ businessid: businessid ]); 
+		if ( addr ) { 
+			facts << new bpls.facts.BusinessLocation( addr ); 
+			if ( addr.barangay?.objid ) {
+				def brgyFact = new treasury.facts.LGUBarangay(); 
+				brgyFact.orgid = addr.barangay.objid; 
+				facts << brgyFact; 
+			} 
+		} 
+	} 
+}

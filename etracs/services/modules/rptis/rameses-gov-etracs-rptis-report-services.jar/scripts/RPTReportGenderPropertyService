@@ -1,0 +1,58 @@
+import com.rameses.annotations.*
+import com.rameses.common.*;
+import com.rameses.services.extended.*;
+
+class RPTReportGenderPropertyService
+{
+    @Env 
+    def env 
+
+    @Service('RPTUtil')
+    def util 
+
+    @Service('DateService')
+    def dtSvc
+
+    @ActiveDB('rptreport_gender_property')
+    def em
+
+   
+    @Async
+    @ProxyMethod
+    public def getReportData(params) {
+        buildFilter(params)
+        em.debug = true
+        def list = em.getSummaries(params)
+        if (!list) throw new Exception('There are no records found.')
+        return [
+            parameters: [:],
+            reportdata  : list
+        ]
+    }
+
+    void buildFilter(params) {
+        params.filter = ''
+        if (params.ry) {
+            params.filter += ' AND ry = $P{ry}' 
+        }
+        if (params.rputype) {
+            params.rputypeid = params.rputype.type
+            params.filter += ' AND rputype = $P{rputypeid}'
+        }
+        if (params.lgu) {
+            params.lguid = params.lgu.objid
+            params.filter += ' AND lguid = $P{lguid}'
+        }
+        if (params.barangay) {
+            params.barangayid = params.barangay.objid
+            params.filter += ' AND barangayid = $P{barangayid}'
+        }
+        if (params.classification) {
+            params.classificationid = params.classification.objid
+            params.filter += ' AND classification_objid = $P{classificationid}'
+        }
+        println '\n\n\n** params => ' + params
+    }
+
+
+}

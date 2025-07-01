@@ -1,0 +1,125 @@
+import com.rameses.annotations.*;
+import com.rameses.util.*;
+import java.rmi.server.*;
+import com.rameses.services.extended.*;
+
+public class CashReceiptBarcodeService {
+	
+	@DataContext("collectiontype")
+	def collectionTypeEm;
+
+	@DataContext("barcode_launcher")
+	def barcodeLauncherEm;
+
+	@DataContext( dynamic=true )
+	def dynaEm;
+
+	@Service(dynamic=true)
+	def dynSvc;
+
+	@Env
+	def env;
+
+	private def getPaymentOrderService(def conn) {
+		if( conn==null || conn=="default" )	{
+			return dynSvc.lookup("PaymentOrderService");
+		}	
+		else {
+			return dynSvc.lookup("PaymentOrderService", conn);
+		}	
+	}
+
+	@ProxyMethod
+	public def getBarcodeInfo( value ) {
+		if ( !value ) throw new Exception("barcode  is required in getBarcodeInfo method");
+
+		def str = value.toString();
+		if ( !str.matches("^[^:]+:(.*)"))
+			throw new Exception("Invalid barcode format. It should follow the ff. format <KEY:REFNO>");
+
+		def arr = str.split(":");
+		def barcodekey = arr[0];
+		def refno = arr[1];
+
+		def query_string = "";
+		int query_idx = refno.indexOf('?'); 
+		if ( query_idx > 0 ) {
+			query_string = refno.substring( query_idx + 1 ); 
+			refno = refno.substring( 0, query_idx ); 
+		}
+
+		def query_param = [:];
+		if ( query_string.trim().length() > 0 ) {
+			query_string.split('&').each{ pair-> 
+				arr = pair.split('='); 
+				if ( arr.length > 1 ) {
+					if ( arr[1] && arr[1].contains('%')) {
+						arr[1] = java.net.URLDecoder.decode( arr[1], "UTF-8"); 
+					}
+					query_param[ arr[0]] = arr[1]; 
+				}
+				else if ( arr.length > 0 ) {
+					query_param[ arr[0]] = null; 
+				}
+			}
+		}
+
+		def bc = barcodeLauncherEm.find([ objid: barcodekey ]).first();
+		if ( !bc ) throw new Exception("barcode launcher " + barcodekey + " not found");
+
+		if ( bc.paymentorder == null ) bc.paymentorder = 0;
+
+		def result = [:]; 
+	 	if ( bc.paymentorder == 0 ) {
+	 		result.paidby = query_param.paidby;
+	 		result.paidbyaddress = query_param.paidbyaddress;
+	 		result.barcodeparams = query_param; 
+
+			result.refno = refno;
+			result.barcodeid = refno;
+			result.barcodekey = barcodekey;
+			result.collectiontype = collectionTypeEm.find([objid: bc.collectiontype?.objid.toString() ]).first();
+		}
+		else {
+			def poSvc = getPaymentOrderService( bc.connection );
+			result = poSvc.getBilling([ refno: refno ]);
+			if ( result.refno ) {
+				result.barcodeid = result.refno;
+			}
+			if ( result.params ) {
+				result.barcodeparams = result.params;
+			}
+
+			result.collectiontype = collectionTypeEm.find([objid: result.type.collectiontype.objid ]).first();
+		}
+		return result;	
+	}
+
+	@ProxyMethod
+	public def generateCode( param ) {
+		if ( !param?.txntype ) throw new Exception("txntype  parameter is required");
+		if ( !param?.refno ) throw new Exception("refno  parameter is required");
+
+		def ctEm = dynaEm.lookup('vw_collectiontype_barcode');
+		def ct = ctEm.find([ handler: param.txntype ]).orderBy('sortorder').first(); 
+		if ( !ct ) throw new Exception("Cannot find a collection type with a handler '"+ param.txntype +"' that is associated with a barcode launcher");
+
+		def buff = new StringBuilder();
+		buff.append( ct.barcodekey ).append(':').append( param.refno ); 
+		buff.append('?showdetails=true'); 
+
+		param.each{ k,v-> 
+			if ( !k.toString().toLowerCase().matches('txntype|refno')) {
+				buff.append('&').append( k ).append('='); 
+				if ( v ) { 
+					buff.append( java.net.URLEncoder.encode( v, "UTF-8")); 
+				} 
+			}
+		}
+
+		def result = [:];
+		result.code = buff.toString(); 
+		result.queuesection = ct.queuesection;
+		return result; 
+	} 
+}

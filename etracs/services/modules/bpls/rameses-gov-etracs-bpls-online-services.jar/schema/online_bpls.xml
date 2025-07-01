@@ -1,0 +1,5 @@
+<schema adapter="main">
+	<element tablename="online_business_application">
+		<field name="objid" primary="true" prefix="ONBPAPP"/> 
+	</element> 
+</schema> 

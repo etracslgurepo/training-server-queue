@@ -1,0 +1,11 @@
+provider=s3
+region=US_WEST_2
+bucket=output-docs
+credentials=GsqpCUdJneTldb4ZTSQATElmLtu9KGTnHhNH9tCj1luUcNlTD8yyOVWK6ilBJdXICHgK9AHAuhKBx64GQFBmFw==
+
+viewer.scheme=${filipizen_server_scheme}
+viewer.host=${filipizen_server_host}
+viewer.context=s3/view-docs
+
+viewer.relayscheme=http
+viewer.relayhost=${gdx_proxy_server_ip}:8500

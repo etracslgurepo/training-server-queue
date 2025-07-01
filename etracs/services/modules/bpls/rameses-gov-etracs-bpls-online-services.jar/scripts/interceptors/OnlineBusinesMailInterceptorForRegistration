@@ -1,0 +1,28 @@
+import com.rameses.annotations.*;
+
+class OnlineBusinesMailInterceptorForRegistration {
+
+	@DataContext( dynamic=true )
+	def dynaEm;
+
+	@Service 
+	def self;
+
+
+	@After(pattern="OnlineBusinessMailService.emailTrackingNo")
+	public void emailTrackingNo( evt ) {
+		def param = evt.args[0]; 
+	}
+		
+
+	@Async
+	@ProxyMethod(local=true)
+	void sendEmail( data ) {
+		data.state = 0;
+		data.connection = 'bpls-email-server'; 
+		data.objid = 'SEQ'+ new java.rmi.server.UID(); 
+
+		def em = dynaEm.lookup('sys_email_queue'); 
+		em.create( data ); 
+	} 
+}

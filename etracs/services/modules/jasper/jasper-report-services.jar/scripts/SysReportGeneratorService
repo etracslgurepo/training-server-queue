@@ -1,0 +1,156 @@
+import com.rameses.annotations.*;
+import com.rameses.server.BootLoader;
+import com.rameses.osiris2.reports.*;
+import com.rameses.util.*;
+
+import java.io.*;
+import java.net.*;
+import java.rmi.server.*;
+
+import net.sf.jasperreports.engine.*;
+import net.sf.jasperreports.engine.util.*;
+
+
+class SysReportGeneratorService  {
+
+	@Service("SysReportService")
+	def reportSvc; 
+
+	@Service("SysReportTemplateService")
+	def templateSvc;
+
+	@Service("Var")
+	def varSvc;
+
+	@DataContext("sys_report_template")
+	def reportTemplateEm;
+
+
+	String getOutputReportPath() {
+		return BootLoader.getOutputDirPath() +"/"; 
+	}
+
+
+	@ProxyMethod
+	public def buildFileId( def o ) {
+		def b64 = new Base64Cipher();
+		def arr = [];
+		o.each { k,v->
+			arr << k+"="+v;	
+		}
+		def qryStr = arr.join( "&" );
+		return b64.encode( qryStr ).replaceAll("[+/]", "-").replaceAll("=", "").replaceAll( "\r\n", "~" ); 
+	}
+
+	@ProxyMethod
+	public def buildWebUrl( def o ) {
+		def webUrl = varSvc.get( "sys_report_weburl" );
+		if(!webUrl) throw new Exception("Please specify sys_report_weburl value in the system variables");
+		if(!webUrl.endsWith("/")) webUrl += "/";
+		def ext = o.extension;
+		if(!ext) ext = ".pdf";
+		if(!ext.startsWith(".")) ext = "." + ext;
+ 		return webUrl + buildFileId( o ) + ext;
+	}
+
+	/********
+	* The generate report is called by the system and from GDX.
+	* If called by system 
+	*    a) reportid and parameters are required. 
+	*    b) build the fileid by making reportid+parameters query string 
+	*    c) generate and save the report into the output path + fileid + ".pdf"
+	* If called by GDX 
+	*    a) fileid is required 
+	*    b) decode fileid and parse the query parameters
+	*    c) generate and save the report into the output path + fileid + ".pdf" 	
+	* 
+	********/
+	@ProxyMethod
+	public def generate( def  o ) {
+		def reportid = null;
+		def params;
+		def fileid;
+
+		if( o.fileid ) {
+			def b64 = new Base64Cipher();
+			fileid = o.remove("fileid");
+			if(fileid.endsWith(".pdf")) fileid = fileid.substring( 0, fileid.lastIndexOf(".") );
+			def qryStr = b64.decode( fileid );
+			def map = [:];
+			def rows = qryStr.split("&").each {
+			    def arr = it.split("=");
+			    map.put( arr[0], arr[1] ); 
+			};
+			reportid = map.remove("reportid");
+			params = map; 
+		}
+		else {
+			fileid = buildFileId( o );
+			reportid = o.remove("reportid");
+			params = o;
+		}
+
+		if(!reportid) throw new Exception("reportid required in SysReportGenetarorService.generate"); 
+		
+		def reportDef = reportSvc.findReportDef( [name: reportid ] );
+		if( !reportDef.template ) {
+			return [status:"error", message: "template is not specified in report " + reportid, errno: 100 ];
+		}	
+		def data = reportSvc.getReportData( [name:reportDef.name, params: params ] );
+		if(!data) {
+			return [status:"error", message: "No records found matching the criteria", errno: 101 ];			
+		}
+
+		def tmpSrc = [
+			getResources: { id->
+				return templateSvc.getResources([name:id]);
+			},
+			getContent: { id->
+				return templateSvc.getContent([name:id]);
+			}
+		] as SysReportTemplateSource;	
+
+		def tmp = reportTemplateEm.find([name: reportDef.template]).first();
+		
+		def tp = new SysReportTemplate( "/report-files", tmp.filepath );
+		def jReport = tp.getReport(tmpSrc);
+
+		def classLoader = new CustomClassLoader( tp ); 
+		 
+		def report_params = [:];
+		report_params.REPORT_CLASS_LOADER = classLoader;
+
+		def jasperFile = JasperFillManager.fillReport( jReport, report_params, new ReportDataSource( data ) );
+
+		String tempDestFilename = outputReportPath + '~' + fileid + ".pdf";
+		String destFilename = outputReportPath + fileid + ".pdf";
+		JasperExportManager.exportReportToPdfFile(jasperFile, tempDestFilename );
+		renameFile(tempDestFilename, destFilename);
+		return [status: "ok", filename: destFilename ];
+	}	
+
+    void renameFile(oldFileName, newFileName) {
+        try {
+            def oldFile = new File(oldFileName);
+            def newFile = new File(newFileName);
+            oldFile.renameTo(newFile);
+        } catch(err) {
+            err.printStackTrace();
+        }
+    }
+}
+
+public class CustomClassLoader extends ClassLoader {
+	
+	def reportTemplate;
+	
+	public CustomClassLoader( def tp ) {
+		super();
+		reportTemplate = tp;
+	}
+
+	public URL getResource(String name) { 
+		return reportTemplate.getResource( name );
+    }
+}
+

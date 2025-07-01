@@ -1,0 +1,45 @@
+import com.rameses.annotations.*;
+import com.rameses.util.*;
+import java.rmi.server.*;
+
+
+/**********************************************************
+* This routine is hooked in the CashReceiptService and 
+* CashReceiptVoidService services. It will update each
+* receivable based on amount paid. It will update billing.
+* Billing is the key to determine if license can be
+* released.     
+**********************************************************/
+public class BusinessCashReceiptInterceptor {
+
+	@Service("BusinessPostPaymentService") 
+	def pmtSvc; 
+
+	// handling of bpls receipts
+	// 
+	@After(pattern="CashReceiptService.post", eval="#{result.collectiontype?.handler == 'bpls'}") 
+	public void postPayment( evt ) { 
+		def a = evt.args[0]; 
+		a.reftype = 'cashreceipt'; 
+		pmtSvc.postPayment( a ); 
+	} 
+	@After(pattern="MultiCashReceiptService.post", eval="#{args[0].collectiontype?.handler == 'bpls-multi-receipt'}") 
+	public void postPaymentGroup( evt ) { 
+		def param = evt.args[0]; 
+		param.reftype = 'cashreceipt_group'; 
+		pmtSvc.postPayment( param ); 
+	}
+
+	// handling of bpls void receipts
+	// 
+	@After(pattern="CashReceiptVoidService.post", index=0, eval="#{result.receipt.collectiontype?.handler == 'bpls'}") 
+	public void voidPayment( evt ) { 
+		def r = evt.args[0].receipt; 
+		pmtSvc.postVoidPayment( r ); 
+	} 
+	@After(pattern="CashReceiptVoidService.postReceipts", index=0, eval="#{args[0].collectiontype?.handler == 'bpls-multi-receipt'}") 
+	public void voidPayments( evt ) { 
+		def param = evt.args[0]; 
+		pmtSvc.postVoidPayment( param ); 
+	} 
+}

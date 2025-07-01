@@ -1,0 +1,59 @@
+import com.rameses.annotations.*;
+
+import groovy.text.*;
+import java.util.regex.*;
+import com.rameses.osiris2.reports.*;
+import com.rameses.osiris3.sql.*;
+import groovy.lang.GroovyShell;
+import groovy.lang.Script;
+import org.codehaus.groovy.runtime.InvokerHelper;
+
+class SysMessageTemplateService {
+	
+	@DataContext("sys_message_template")
+	def template;
+
+	@DataContext("sys_message_queue")
+	def msgQueueEm;
+
+	@Service("SysReportDataService")
+	def reportDataSvc;
+
+	@Service("DateService")
+	def dateSvc;
+
+	//If the report data returns a list only the first record will return
+	@ProxyMethod
+	public def getRender(def o ) {
+		if(!o.templateid) throw new Exception("templateid is required in JasperEmailQueueService.send");
+		def templateid = o.remove("templateid");
+		def params = [:];
+		params.putAll( o );
+		def temp = template.find( [objid: templateid ]).first();
+		if(!temp.statement) throw new Exception("statement is required in sys_message_template");
+		if(!temp.subject) throw new Exception("subject is required in sys_message_template");
+		if(!temp.message) throw new Exception("message is required in sys_message_template");
+
+		def rdata = reportDataSvc.getData( [statement: temp.statement, params: params ] );
+	    if(!rdata) throw new Exception("No records processed");
+	    if(rdata instanceof List) rdata = rdata[0];
+
+	    def templateEngine = new groovy.text.SimpleTemplateEngine();
+	    def subjectRenderer = templateEngine.createTemplate(temp.subject); 
+	    def msgRenderer =  templateEngine.createTemplate(temp.message);
+	    def emailRenderer = null;
+	    def mobilenoRenderer = null;
+
+	    if( temp.emailfield ) emailRenderer =  templateEngine.createTemplate(temp.emailfield)
+	    if( temp.mobilenofield ) mobilenoRenderer =  templateEngine.createTemplate(temp.mobilenofield)
+	    def m = [:];
+    	m.subject = subjectRenderer.make( rdata )?.toString(); 
+    	m.message = msgRenderer.make( rdata )?.toString();
+		if(emailRenderer) m.email = emailRenderer.make( rdata )?.toString();
+		if(mobilenoRenderer) m.mobileno = mobilenoRenderer.make( rdata )?.toString(); 
+		return m;
+	}
+
+  
+}
+

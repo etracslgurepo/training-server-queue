@@ -1,0 +1,86 @@
+import com.rameses.annotations.*;
+
+class EORRemittanceReportRcdFundService {
+	
+	@DataContext('eor_remittance')
+	def rem_db; 
+
+	@DataContext('eor_remittance_fund')
+	def remfund_db; 
+
+	@ActiveDB('eor_remittance_rcd')
+	def rcd_db; 
+
+	@Service( dynamic=true )
+	def dynaSvc; 
+
+	@Service("NumberService")
+	def numSvc;
+
+	@ProxyMethod
+	public def initReport( param ) {
+		if ( !param.remittanceid ) { 
+			throw new Exception('remittanceid parameter is required'); 
+		}
+
+		def result = [ funds: []]; 
+		def remittanceFunds = remfund_db.find([ remittanceid: param.remittanceid ])
+								  .where('fund.objid IS NOT NULL')
+								  .select('objid,remittanceid,fund.*')
+								  .orderBy('fund.code, fund.title')
+								  .list(); 
+		remittanceFunds.each{
+			def fund = it.fund; 
+			fund.remittanceid = it.remittanceid; 
+			fund.remittancefundid = it.objid;
+			result.funds << fund; 
+		}
+		return result; 
+	}
+
+	@ProxyMethod 
+	public def getReport( param ) { 
+		if ( !param.remittanceid ) throw new Exception('remittanceid parameter is required'); 
+
+		def data = rem_db.find([ objid: param.remittanceid ]).first();  
+		if ( !data ) throw new Exception("No record(s) found ");
+
+		def remfund = remfund_db.find([ remittanceid: param.remittanceid ])
+								.where('fund.objid = :fundid', [ fundid: param.fundid ])
+								.first(); 
+		if ( !remfund?.objid ) {
+			throw new Exception("Remittance fund not found");
+		}
+
+		data.fund = remfund.fund; 
+		data.validation = ( remfund.validation ?: [:] );
+		data.receipts = rcd_db.getFundReceipts([ remittancefundid: remfund.objid ]); 
+		data.summary = rcd_db.findFundReceiptSummary([ remittancefundid: remfund.objid ]); 
+
+		def financialSvc = dynaSvc.lookup('PersistenceService', 'financial'); 
+		def bankaccount = financialSvc.read([_schemaname: 'bankaccount', findBy: [objid: remfund.bankaccount?.objid.toString()]]); 
+		data.validation.acctno = bankaccount?.code; 
+
+		def controlno = data.controlno +'-'+ remfund.fund.code;
+
+		data.controlno = controlno; 
+		data.amount = remfund.amount; 
+
+		if ( data.createdby?.objid ) {
+			def userSvc = dynaSvc.lookup('PersistenceService', 'admin'); 
+			def user = userSvc.read([ _schemaname: 'sys_user', findBy: [objid: data.createdby.objid]]); 
+			if ( user ) {
+				data.createdby.name = user.fullname; 
+				data.createdby.title = user.jobtitle; 
+			} 
+		}
+
+		data.amountinwords = numSvc.doubleToWords( data.amount ); 
+
+		def balances = rcd_db.getPrevBalances( param ); 
+		data.prevbalance = balances.find{( it.fundid == data.fund.objid )}?.balance; 
+		data.prevbalance = ( data.prevbalance ?: 0 ); 
+		data.postbalance = ( data.prevbalance - data.amount ); 
+		return data; 
+	}
+}

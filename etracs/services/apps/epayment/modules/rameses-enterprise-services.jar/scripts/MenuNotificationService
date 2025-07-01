@@ -1,0 +1,14 @@
+import com.rameses.annotations.*;
+
+/*****************************************************************
+This should be transferred in more generic like system services
+*****************************************************************/
+
+class MenuNotificationService {
+	
+	@ProxyMethod
+	public def getCount(def o ) {
+		return [count:0];
+	}
+	
+}

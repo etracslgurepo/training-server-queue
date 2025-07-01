@@ -1,0 +1,41 @@
+import com.rameses.annotations.*;
+
+class QueueService { 
+
+	@Service( dynamic=true )
+	def dynaSvc; 
+
+
+	@ProxyMethod 
+	public def getGroups() {
+		def svc = dynaSvc.lookup('QueueGroupService');
+		return svc.getGroups(); 
+	} 
+
+	@ProxyMethod 
+	public def getGroupsWithSections() {
+		def svc = dynaSvc.lookup('QueueGroupService');
+		return svc.getGroupsWithSections(); 
+	} 
+
+	@ProxyMethod 
+	public def getSections( param ) {
+		if ( !param.groupid ) throw new Exception('groupid  parameter is required'); 
+
+		def svc = dynaSvc.lookup('QueueGroupService');
+		return svc.getSections( param.groupid ); 
+	} 
+
+	@ProxyMethod 
+	public void resetSeries( param ) {
+		def svc = dynaSvc.lookup('QueueGroupService');
+		svc.resetSeries( param ); 
+	}
+
+	@ProxyMethod 
+	public def fetchNextTicket( param ) {
+		def svc = dynaSvc.lookup('QueueService');
+		return svc.fetchNextTicket( param ); 
+	}
+
+} 

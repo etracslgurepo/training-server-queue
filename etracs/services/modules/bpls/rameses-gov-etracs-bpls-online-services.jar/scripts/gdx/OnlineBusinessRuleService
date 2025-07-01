@@ -1,0 +1,173 @@
+import com.rameses.annotations.*;
+import com.rameses.util.KeyGen; 
+import java.rmi.server.UID;
+
+class OnlineBusinessRuleService {
+
+	@Env 
+	def env; 
+
+	@Service( dynamic=true )
+	def dynaSvc; 
+
+	@ProxyMethod
+	public Map getInfos( Map param ) {
+		init();
+		validate( param, 'getInfos' );
+		resolveAddress( param.address ); 
+
+		def map = buildApp( param ); 
+		map.onlineapplication = [objid: 'onlineapplication-getInfos'];  
+		map.infos = [];
+		map.appinfos = [];
+		map.assessmentinfos = [];
+		map.requirements = [];
+		map.taxfees = [];
+		map.lastqtrpaid = 0; 
+
+		if ( param.infos instanceof List ) { 
+			map.infos = param.infos; 
+		}
+
+		def infoRuleSvc = dynaSvc.lookup('BPInfoRuleService'); 
+    	def res = infoRuleSvc.execute( map );
+    	res.infos.each{
+    		it.name = it.attribute.name; 
+    		it.caption = it.attribute.caption;
+    	}
+    	return res;
+	} 
+
+
+
+	@ProxyMethod
+	public List getRequirements( param ) {
+		init();
+		validate( param, 'getRequirements' );
+		resolveAddress( param.address ); 
+
+		def app = buildApp( param ); 
+		app.onlineapplication = [objid: 'onlineapplication-getRequirements']; 
+
+		def reqRuleSvc = dynaSvc.lookup('BPRequirementRuleService'); 
+		def ruleRes = reqRuleSvc.execute( app ); 
+
+		def doctype = [reftype: 'UAF', title: 'UNIFIED APPLICATION FORM'];
+		def uaf = [objid: doctype.reftype, caption: doctype.title, ref: doctype, required: false, sortorder: 0]; 
+
+		def docList = [ uaf ]; 
+
+		ruleRes.requirements.each{ 
+			def mm = [objid: it.reftype, caption: it.title, ref: it, required: false, sortorder: 1]; 
+			mm.required = ( it.step ? true : false ); 
+			docList << mm; 
+		} 
+		ruleRes.clear(); 
+
+		def newList = [];
+		docList.findAll{( it.required == true )}.sort{ it.sortorder.toString() +'-'+ it.caption }.each{ 
+			newList << it; 
+		}
+		docList.findAll{( it.required == false )}.sort{ it.sortorder.toString() +'-'+ it.caption }.each{ 
+			newList << it; 
+		}
+		docList.clear();
+		return newList; 
+	}
+
+
+	// 
+	// helper methods
+	// 
+	void validate( Map param, String callingMethodName ) {
+		if ( !param ) throw new Exception('please provide the parameters for '+ callingMethodName);
+		if ( !param.apptype ) throw new Exception("'apptype'  parameter is required in "+ callingMethodName);
+		if ( !param.appyear ) throw new Exception("'appyear'  parameter is required in "+ callingMethodName);
+		if ( !param.appdate ) throw new Exception("'appdate'  parameter is required in "+ callingMethodName);
+		if ( !param.tradename ) throw new Exception("'tradename'  parameter is required in "+ callingMethodName);
+		if ( !param.businessname ) throw new Exception("'businessname'  parameter is required in "+ callingMethodName);
+		if ( !param.address ) throw new Exception("'address'  parameter is required in "+ callingMethodName);
+		if ( !param.orgtype?.id ) throw new Exception("'orgtype.id'  parameter is required in "+ callingMethodName);
+		if ( !param.primarylob?.objid ) throw new Exception("'primarylob'  parameter is required in "+ callingMethodName);
+
+		def lobs = [ param.primarylob ];
+		if ( param.lobs instanceof List ) {
+			lobs.addAll( param.lobs ); 
+		}		
+
+		lobs.eachWithIndex{ o,idx-> 
+			if ( !(o.lob instanceof Map ))
+				throw new Exception("'lobs["+ idx +"].lob.objid'  parameter is required in "+ callingMethodName);
+			if ( !o.lob?.objid )
+				throw new Exception("'lobs["+ idx +"].objid'  parameter is required in "+ callingMethodName);
+			if ( !o.lob?.name )
+				throw new Exception("'lobs["+ idx +"].name'  parameter is required in "+ callingMethodName);
+			if ( !(o.lob?.classification instanceof Map ))
+				throw new Exception("'lobs["+ idx +"].classification.objid'  parameter is required in "+ callingMethodName);
+			if ( !o.lob?.classification?.objid )
+				throw new Exception("'lobs["+ idx +"].classification.objid'  parameter is required in "+ callingMethodName);
+		}
+
+		param.orgtypeid = param.orgtype.id.toString().toUpperCase(); 
+	}
+
+	void resolveAddress( Map addr ) {
+		if ( addr.rented.toString().matches('true|1')) {
+			addr.type = 'rented'; 
+		}
+		else if ( addr.inlgumarketrental.toString().matches('true|1')) { 
+			addr.type = 'government'; 
+		}
+
+		if ( !addr.type ) { 
+			addr.type = 'local'; 
+		}
+
+		if ( !(addr.barangay instanceof Map)) {
+			def brgyname = addr.barangay; 
+			addr.barangay = [name: brgyname]; 
+		}
+
+		def s1 = [addr.bldgno, addr.bldgname, addr.unitno].findAll{( it )}.join(' '); 
+		def s2 = [addr.street, addr.subdivision, addr.barangay.name].findAll{( it )}.join(' '); 
+		addr.text = [s1, s2].findAll{( it )}.join(' '); 
+	}
+
+	Map buildApp( Map app ) {
+		def map = [business: [:]]; 
+		map.business.address = app.address;
+		map.business.permittype = 'BUSINESS'; 
+		map.business.officetype = 'MAIN'; 
+		map.business.orgtype = app.orgtypeid; 
+		map.appdate = app.appdate; 
+		map.appyear = app.appyear; 
+		map.apptype = app.apptype; 
+		map.orgtype = app.orgtypeid; 
+		map.yearstarted = app.yearstarted; 
+
+		map.dtfiled = app.appdate;
+		map.txnmode = 'ONLINE'; 
+		map.lobs = [];
+
+		def lobs = [ app.primarylob ]; 
+		if ( app.lobs ) lobs.addAll( app.lobs ); 
+
+		lobs.each{
+			def mm = [
+				objid: 'BUSLOB-'+ new java.rmi.server.UID().toString(), 
+				lobid: it.lob.objid, name: it.lob.name, 
+				classification: it.lob.classification, 
+				assessmenttype: map.apptype
+			];
+			map.lobs << mm; 
+		}
+
+		return map;
+	}
+
+	void init() { 
+		if ( !env.CLIENTTYPE ) { 
+			env.CLIENTTYPE = 'gdx'; 
+		}
+	}
+} 

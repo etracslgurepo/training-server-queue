@@ -1,0 +1,111 @@
+import com.rameses.annotations.*;
+import com.rameses.common.*;
+import com.rameses.util.*;
+
+class EORManualPostService {
+
+    @Service( dynamic=true )
+    def dynaSvc; 
+
+    @DataContext( dynamic=true ) 
+    def dynaEm;
+
+    @Env
+    def env;
+
+
+    @DataContext("eor_manual_post")	
+    def manualPostEm;
+
+
+    @ProxyMethod
+    public def post( param ) {
+        validateUnsetParam('paymentorderno', param.paymentorderno);
+        validateUnsetParam('paymentorderno', param.amount);
+
+        def findById = [ objid: param.paymentorderno ];
+
+        def poEm = dynaEm.lookup('eor_paymentorder'); 
+        def po = poEm.find( findById ).first();
+        if ( !po ) {
+            poEm = dynaEm.lookup('eor_paymentorder_paid'); 
+            po = poEm.find( findById ).first();
+            if ( po ) throw new Exception("Payment order is already paid");
+
+            poEm = dynaEm.lookup('eor_paymentorder_cancelled'); 
+            po = poEm.find( findById ).first();
+            if ( po ) throw new Exception("Payment order is already cancelled");
+
+            throw new Exception("Payment order does not exist.");
+        }    
+        if ( po.amount != param.amount ) 
+            throw new Exception("Amount specified does not match with the payment order");
+
+
+        validateUnsetParam('paymentpartnerid', param.paymentpartnerid);
+
+        def payPartnerEm = dynaEm.lookup('paymentpartner'); 
+        if ( !payPartnerEm.find([ objid: param.paymentpartnerid ]).first()) {
+            throw new Exception("'"+ param.paymentpartnerid +"' pay partner does not exist");
+        }
+
+        def errorEm = dynaEm.lookup('eor_payment_error'); 
+        def error = errorEm.find([ paymentrefid: param.paymentorderno ]).first();
+        if ( error ) throw new Exception("There is an entry in the errors list. Please resolve that first");
+
+        param.dtcreated = dynaSvc.lookup('DateService').getServerDate();
+        param.createdby = [objid: env.USERID, name: env.FULLNAME];
+        param.txntype = po.txntype;
+        param.state = "POSTED";
+
+        def pmt = manualPostEm.create( param );
+        pmt._type = 'eor_manual_post'; 
+
+        def epaymentSvc = dynaSvc.lookup('EPaymentService'); 
+        epaymentSvc.postPayment( pmt );
+
+        error = errorEm.find([ paymentrefid: param.paymentorderno ]).first();
+        if ( error ) {
+            error._type = 'eor_payment_error';
+            error.status = 'error';
+
+            try {
+                def notifySvc = dynaSvc.lookup('EPaymentNotificationService');
+                notifySvc.send("epayment_error", [:]); 
+                notifySvc.send("epayment", [:]); 
+            } 
+            catch(Throwable t) {
+                t.printStackTrace(); 
+            }
+            finally { 
+                return error; 
+            }             
+        }
+        else {
+            return pmt; 
+        }
+    }
+
+ 	@ProxyMethod
+    public def open( param ) { 
+		return manualPostEm.find([ objid: param.objid ]).first(); 
+    }
+
+    @ProxyMethod
+    public def getTxnTypes() {
+        def em = dynaEm.lookup('epayment_plugin'); 
+        return em.select("objid").limit(100).list().collect{ it.objid } 
+    }
+
+    @ProxyMethod
+    public def getPaymentPartners() {
+        def em = dynaEm.lookup('paymentpartner'); 
+        return em.select("objid").limit(100).list().collect{ it.objid } 
+    }
+
+    void validateUnsetParam( name, value ) {
+        if ( !value ) {
+            throw new Exception("'"+ name +"' parameter is required");
+        }
+    }
+}

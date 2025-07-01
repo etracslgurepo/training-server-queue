@@ -1,0 +1,23 @@
+import com.rameses.annotations.*;
+
+class OnlineBusinessAppFactBuilderInterceptor {
+
+	@DataContext( dynamic=true )
+	def dynaEm;
+
+	@Before( pattern="BusinessApplicationFactBuilder.build")
+	public void beforeBuild( evt ) {
+		def app = evt.args[0];
+		if ( app?.onlineapplication ) { 
+			// online application is already loaded
+			return; 
+		}
+
+		if ( app?.objid ) {
+			def em = dynaEm.lookup('online_business_application');
+
+			def oapp = em.find([ objid: app.objid ]).select('objid,dtcreated,controlno,contact.*').first();
+			app.onlineapplication = oapp; 			
+		}
+	} 
+}

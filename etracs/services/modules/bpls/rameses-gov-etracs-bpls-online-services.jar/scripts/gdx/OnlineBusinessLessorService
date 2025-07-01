@@ -1,0 +1,17 @@
+import com.rameses.annotations.*;
+
+public class OnlineBusinessLessorService {
+
+	@Service( dynamic=true )
+	def dynaSvc;
+
+
+	@ProxyMethod
+	public def getLessors( param ) { 
+		def svc = dynaSvc.lookup('QueryService');
+		def qmap = [_schemaname: 'business_lessor']; 
+		qmap.where = '1=1'; 
+		qmap.orderBy = 'bldgname';
+		return svc.getList( qmap ); 
+	}
+}

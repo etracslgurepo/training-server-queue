@@ -1,0 +1,32 @@
+import com.rameses.annotations.*
+
+class PostEORInterceptor {
+    
+    @Service( dynamic=true )
+    def dynaSvc; 
+
+    @Before( pattern="EORService.post" )
+    public void beforePost( evt ) {
+        def po = evt.args[0];
+        if ( !po ) return;
+
+        if ( po.items ) {
+            def queryParam = [ _schemaname: 'itemaccount' ];
+            queryParam.select = 'objid,code,title,fund.*'; 
+            queryParam.node = [:]; 
+
+            def ids = po.items.collect{ it.item?.objid }.findAll{( it )}.unique(); 
+            queryParam.where = [ "objid IN ('"+ ids.join("','") +"')", [:]]; 
+
+            def querySvc = dynaSvc.lookup('QueryService', 'financial'); 
+            def list = querySvc.getList( queryParam ); 
+
+            po.items.each{ o-> 
+                if ( o.item?.objid ) {
+                    def item = list.find{( it.objid == o.item.objid )}
+                    if ( item ) o.item = item; 
+                } 
+            } 
+        }
+    } 
+}

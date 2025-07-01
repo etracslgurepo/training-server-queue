@@ -1,0 +1,12 @@
+<schema>
+	<element  tablename="sys_fileloc">
+		<field name="objid" primary="true" prefix="FILELOC"/>
+		<field name="url" required="true" />
+		<field name="rootdir" />
+		<field name="defaultloc" required="true" />
+		<field name="loctype" required="true" />
+		<field name="user_name" />
+		<field name="user_pwd" />
+		<complex name="info" serializer="default" />
+	</element>
+</schema>

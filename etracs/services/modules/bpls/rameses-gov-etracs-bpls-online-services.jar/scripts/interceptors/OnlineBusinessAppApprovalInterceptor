@@ -1,0 +1,123 @@
+import com.rameses.annotations.*;
+
+class OnlineBusinessAppApprovalInterceptor {
+	
+	final String DFEAULT_MAIL_CONNECTION = "bpls-email-server"; 
+
+	@DataContext( dynamic=true )
+	def dynaEm; 
+
+	@Service( dynamic=true )
+	def dynaSvc; 
+
+	@Service 
+	def self; 
+
+	@Service("BusinessApplicationWorkflowService")
+	def workflowSvc;
+
+
+	@After(pattern="OnlineBusinessApplicationService.approve")
+	public void afterApprove( evt ) {
+		def result = evt.result; 
+
+		if ( !result.objid ) 
+			throw new Exception('OnlineBusinessAppApprovalInterceptor requires result.objid'); 
+		if ( !result.apptype ) 
+			throw new Exception('OnlineBusinessAppApprovalInterceptor requires result.apptype'); 
+		if ( !result.approvedappno ) 
+			throw new Exception('OnlineBusinessAppApprovalInterceptor requires result.approvedappno'); 
+
+		if ( !(result.data instanceof Map)) 
+			throw new Exception('OnlineBusinessAppApprovalInterceptor requires result.data'); 
+		if ( !result.data.txndate )
+			throw new Exception('OnlineBusinessAppApprovalInterceptor requires result.data.txndate'); 
+
+
+		def apptype = result.apptype;
+		if ( !apptype.matches('NEW|RENEW')) {
+			// not a valid application type 
+			return; 
+		} 
+
+		if ( apptype == 'RENEW' ) { 
+			// THIS IS CALLED MANUALLY 
+			// SINCE DATA ARE ALSO MANUALLY INSERTED 
+			// AND DOES NOT FOLLOW THE ROUTINE OF THE RENEWAL PESISTENCE
+			workflowSvc.start([ refid: result.objid, data: result.data ]); 
+		}
+
+		def email = result.contact?.email; 
+		def appno = result.approvedappno; 
+		if ( email ) { 
+			def data = [:]; 
+			data.to = email; 
+			data.refid = result.objid; 
+			data.dtsent = result.data.txndate; 
+
+			data.putAll( createMsg( result, apptype, appno )); 
+			self.sendEmail( data ); 
+		} 
+
+		def mobileno = result.contact?.mobileno; 
+		if ( mobileno ) {
+			def msgParam = createMsg( result, apptype, appno ); 
+			msgParam.phoneno = mobileno; 
+			self.sendSMS( msgParam ); 
+		}
+	}
+
+	def createMsg( data, apptype, appno ) {
+		data.apptypedesc = '';
+		if ( apptype == 'RENEW' ) {
+			data.apptypedesc = 'Renewal';
+		} 
+		else if ( apptype == 'NEW' ) {
+			data.apptypedesc = 'Registration';
+		} 
+
+		def res = [:]; 
+		res.subject = """Online Business ${data.apptypedesc} Approval""".toString(); 
+		res.message = """
+<br>
+<b>Hi ${data.contact?.name ? data.contact.name : ''}!</b> 
+<br><br>
+<span style="font-size:1.2em;">
+	We are pleased to inform you that your Online Business ${data.apptypedesc} Application has been approved. 
+  	<br> Your application number is <b>${data.approvedappno}</b>.
+
+	<br><br>
+  	We kindly request you to check your email regularly for updates and follow any instructions provided.
+
+  	<br><br><br>
+  	Thank you for using Filipizen!
+</span>
+		""".toString();  
+
+		return res; 
+	}
+
+
+	@Async
+	@ProxyMethod(local=true)
+	void sendEmail( data ) {
+		data.state = 0;
+		data.connection = DFEAULT_MAIL_CONNECTION; 
+		data.objid = 'SEQ'+ new java.rmi.server.UID(); 
+
+		def em = dynaEm.lookup('sys_email_queue'); 
+		em.create( data ); 
+	} 
+
+	@Async
+	@ProxyMethod(local=true)
+	void sendSMS( param ) {
+		def svc = dynaSvc.lookup('SMSService'); 
+		if ( svc ) {
+			svc.send([ phoneno: param.phoneno, message: param.message ]);  	
+		}
+		else {
+			println 'SMSService cannot be found. Please verify.'; 
+		}
+	} 
+}

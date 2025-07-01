@@ -1,0 +1,33 @@
+import com.rameses.annotations.*;
+
+public class LobListQueryInterceptor {
+
+	@DataContext( dynamic=true )
+	def dynaEm;
+
+	@Before(pattern="QueryService.getList", eval="#{args[0]._schemaname == 'lob' && args[0].attribute !=null }")
+	public void beforeGetList( evt ) { 
+		def p = evt.args[0];
+		if(!p.where) {
+			p.where = [ "objid IN (SELECT lobid FROM lob_lobattribute  WHERE lobattributeid IN ( '" + p.attribute.objid +  "' ) ) "  ]
+		}
+	}
+
+
+	@After(pattern="QueryService.getList", eval="#{args[0]._schemaname == 'lob'}")
+	public void afterGetList( evt ) {
+		def lobs = evt.result; 
+		def psicids = lobs.collect{ it.psicid }.findAll{( it )}
+		if ( psicids ) {
+			def em = dynaEm.lookup('psic_subclass'); 
+			em.where("code IN ('"+ psicids.join("','") +"')");
+			em.select('code,description'); 
+
+			em.list().each{ o-> 
+				lobs.findAll{( it.psicid == o.code )}.each{
+					it.psic = o; 
+				}
+			} 
+		}
+	}  
+}

@@ -1,0 +1,300 @@
+import com.rameses.annotations.*;
+import com.rameses.util.KeyGen; 
+import java.rmi.server.UID;
+
+class OnlineBusinessApplicationService {
+
+	@DataContext( dynamic=true )
+	def dynaEm; 
+
+	@Service( dynamic=true ) 
+	def dynaSvc;
+
+	@XConnection( dynamic=true )
+	def dynaConn;
+
+	@Context
+	def ctx;
+
+	@ProxyMethod 
+	public def approve( param ) {
+		def app = findApp( param.objid, null );		
+		if ( !app.state.toString().matches('OPEN')) 
+			throw new Exception('Application record must be in OPEN status'); 
+
+		
+		def lob_ids = app.lobs.collect{ it.lob?.objid }.findAll{( it )}
+		def em = dynaEm.lookup('lob_lobattribute'); 
+        em.where("lobid IN ('"+ lob_ids.join("','") +"')"); 
+
+        def lobattr_ids = em.list().collect{ it.lobattributeid }
+        lobattr_ids.unique();
+
+		def svc = null; 
+
+		if ( app.apptype == 'NEW' ) {
+			svc = dynaSvc.lookup('bpls/OnlineAppNewService'); 
+		} 
+		else {
+			svc = dynaSvc.lookup('bpls/OnlineAppRenewalService'); 
+		}
+
+		svc.approve( app ); 
+		
+		em = dynaEm.lookup('vw_online_business_application'); 
+		
+		def findby = [ objid: app.objid ]; 
+		def res = em.findProcessApp( findby ); 
+		if ( !res ) throw new Exception('failed to locate record in findProcessApp'); 
+		
+		res.data = em.findBusinessApp( findby ); 
+		if ( !res.data.apptype ) {
+			res.data.apptype = res.apptype; 
+		}
+		if ( !res.data.lobattributes ) {
+			res.data.lobattributes = lobattr_ids; 
+		} 
+		return res; 
+	}
+
+	@ProxyMethod 
+	public void mapTaxpayer( param ) { 
+		def app = findApp( param.objid, 'objid,state,apptype,datainfo' );	
+		if ( !app.state.toString().matches('OPEN')) 
+			throw new Exception('Application record must be in OPEN status'); 
+
+		if ( app.apptype != 'NEW' )
+			throw new Exception('This feature is applicable only for NEW application'); 
+
+		if ( !param.taxpayerid )
+			throw new Exception("'taxpayerid'  parameter is required in mapTaxpayer method"); 
+
+		app.datainfo.taxpayerid = param.taxpayerid; 
+
+		def em = dynaEm.lookup('online_business_application'); 
+		em.find([ objid: app.objid ]).update([ datainfo: app.datainfo ]); 
+	} 
+
+	@ProxyMethod 
+	public void unmapTaxpayer( param ) { 
+		def app = findApp( param.objid, 'objid,state,apptype,datainfo' );	
+		if ( !app.state.toString().matches('OPEN')) 
+			throw new Exception('Application record must be in OPEN status'); 
+
+		if ( app.apptype != 'NEW' )
+			throw new Exception('This feature is applicable only for NEW application'); 
+
+		app.datainfo.remove('taxpayerid'); 
+
+		def em = dynaEm.lookup('online_business_application'); 
+		em.find([ objid: app.objid ]).update([ datainfo: app.datainfo ]); 
+	} 
+
+	@ProxyMethod 
+	public def updateRequirement( param ) { 
+		if ( !param.appid ) 
+			throw new Exception("'appid'  parameter is required in updateRequirement method"); 
+		if ( !param.objid ) 
+			throw new Exception("'objid'  parameter is required in updateRequirement method"); 
+
+		def app = findApp( param.appid, 'objid,state,requirements' ); 
+		if ( !app.state.toString().matches('OPEN')) 
+			throw new Exception('Application record must be in OPEN status'); 
+
+		def selectedItem = null; 
+		if ( param.docid ) { 
+			selectedItem = app.requirements.find{ it.docid == param.docid }
+		} else {
+			selectedItem = app.requirements.find{ it.objid == param.objid }
+		}
+
+		if  ( !selectedItem ) 
+			throw new Exception('Cannot locate the selected requirement'); 
+
+		selectedItem.refno = param.refno; 
+		selectedItem.dtissued = param.dtissued; 
+		selectedItem.placeissued = param.placeissued; 
+
+		app.remove('state');
+
+		def em = dynaEm.lookup('online_business_application'); 
+		em.find([ objid: param.appid ]).update( app );
+		return selectedItem; 
+	} 
+
+
+	def findApp( objid, selectFields ) {
+		if ( !objid ) throw new Exception('objid parameter is required');  
+
+		def em = dynaEm.lookup('online_business_application'); 
+
+		def findby = [ objid: objid ];
+		em = em.find( findby ); 
+		if ( selectFields ) { 
+			em.select( selectFields );
+		} 
+
+		def app = em.first(); 
+		if ( app ) return app; 
+
+		throw new Exception('Online application record not found'); 
+	}
+
+
+	@ProxyMethod 
+	public def buildSendBackMessageTemplate( param ) {
+		if ( !param?.objid )
+			throw new Exception("'objid' parameter is required in buildSendBackMessageTemplate"); 
+
+		def em = dynaEm.lookup("online_business_application");
+		em.select("objid,state,controlno,apptype,step,partnername,contact.*");
+
+		def oapp = em.find([ objid: param.objid ]).first(); 
+		if ( !oapp?.objid )
+			throw new Exception("This online business application record does not exist"); 
+		if ( !oapp.state.toString().matches('OPEN|SEND_BACK'))
+			throw new Exception("This online business application record must be in OPEN state"); 
+
+		def cloudSvc = dynaSvc.lookup("partner/CloudEncryptService", "cloud-server");
+		def cloudParam = [values: [ oapp.controlno, oapp.contact.email ]]; 
+		
+		def checksum = cloudSvc.encrypt( cloudParam )?.value; 
+
+        def contact_name = oapp.contact.name; 
+        if ( !contact_name ) contact_name = "";
+
+		def href = new StringBuilder();
+		href.append( ctx.conf.get('filipizen_server_scheme')).append('://'); 
+		href.append( ctx.conf.get('filipizen_server_host')).append('/'); 
+		href.append( oapp.apptype == 'RENEW' ? 'partner' : 'partners');
+		href.append( '/').append( oapp.partnername ).append('/bpls/');
+		href.append( oapp.apptype == 'RENEW' ? 'renewbusiness' : 'newbusiness');
+		if ( oapp.apptype == 'NEW' ) {
+			href.append( '/').append( oapp.controlno ); 
+			href.append( '?c=').append( checksum ); 			
+		}
+
+		def refno = oapp.controlno; 
+
+		def buff = new StringBuilder();
+        buff.append(
+"""
+<b>Hi ${contact_name}</b>,
+
+<span style="font-size:1.2em;">
+I hope this email finds you well. I am reaching out to provide you with an update on the status of your recent business application with the reference <b>${refno}</b>.
+
+After careful review, we have identified a few areas that require modification to ensure that your application aligns perfectly with our requirements. 
+
+Here are the specific modifications we recommend:
+
+1. [Detail 1]
+2. [Detail 2]
+
+
+If you have any questions or concerns about the proposed modifications, please do not hesitate to reach out. We are here to support you throughout this process and want to ensure that your application reflects the true potential of your business.
+
+
+""".toString());
+
+        	buff.append("""To proceed with the modification, please visit or click &nbsp; <a href="${href}" style="font-size:1.12em;"> filipizen.com </a>""");
+
+        	if ( oapp.apptype == 'RENEW' ) {
+        		buff.append("\nand choose the action <b>Resume Pending Application</b>, and then provide the reference number");
+        	} 
+
+        	buff.append(
+"""
+
+
+Thank you for your understanding and commitment to this process.
+
+</span>
+""".toString());
+
+        	return [message: buff.toString()]; 
+	}
+
+
+	@ProxyMethod
+	public def moveToSendBack( param ) {
+		if ( !param?.objid )
+			throw new Exception("'objid' parameter is required in moveToSendBack"); 
+		if ( !param?.email )
+			throw new Exception("'email' parameter is required in moveToSendBack"); 
+		if ( !param?.message )
+			throw new Exception("'message' parameter is required in moveToSendBack"); 
+
+		def em = dynaEm.lookup("online_business_application");
+		em.select("objid,state,controlno,apptype,step,partnername");
+
+		def oapp = em.find([ objid: param.objid ]).first(); 
+		if ( !oapp?.objid )
+			throw new Exception("This online business application record does not exist"); 
+		if ( !oapp.state.toString().matches('OPEN|SEND_BACK') )
+			throw new Exception("This online business application record must be in OPEN state"); 
+
+		def orgid = dynaSvc.lookup("OrgService").getRoot()?.code; 
+		orgid = orgid.replace('-', '').trim();
+
+		def cloudSvc = dynaSvc.lookup("partner/CloudEncryptService", "cloud-server");
+		def cloudParam = [values: [ oapp.controlno, param.email ]]; 
+		def checksum = cloudSvc.encrypt( cloudParam )?.value; 
+
+		if ( oapp.apptype == 'NEW' ) {
+			def gdxConf = dynaConn.lookup('cloud-server')?.conf;
+			def appHost = (gdxConf ? gdxConf.get('app.host') : null); 
+
+			def href = new StringBuilder();
+			href.append( 'http://').append( appHost ); 
+			href.append( '/api/bp/app/resend?partnerid=').append( orgid );
+			href.append( '&trackingno=').append( oapp.controlno ); 
+			href.append( '&c=').append( checksum );
+			href.append( '&step=7');
+
+			def res = [:]; 
+			try {
+				def url = new java.net.URL( href.toString());
+				def bytes = com.rameses.io.IOStream.toByteArray( url ); 
+				def jsonStr = ( bytes ? new String( bytes ) : "{}" ); 
+				res = new com.rameses.util.JSON().decode( jsonStr ); 
+			} 
+			catch (Throwable t) {
+				throw new Exception('Error invoking /api/bp/app/resend');
+			}
+
+			if ( res?.status == 'ERROR' ) {
+			   def buff = new StringBuilder();
+			   buff.append("[").append( res.status ).append("]")
+			   if ( res.code ) { 
+			   	buff.append(" ").append( res.code ); 
+			   } 
+
+			   buff.append(" - ")
+
+			   if ( res.error ) {
+			   	buff.append( res.error ); 
+			   } else {
+			   	buff.append("failed invoking /api/bp/app/resend");
+			   }
+			   throw new Exception( buff.toString());
+			}
+
+			em.find([ objid: oapp.objid ]).update([ state: 'SEND_BACK' ]);
+		}
+		else if ( oapp.apptype == 'RENEW' ) {
+			em.find([ objid: oapp.objid ]).update([ state: 'SEND_BACK', step: 1 ]);
+		}
+
+		def req = [ to: param.email, state: 0 ];
+		req.subject = "Business Application for Modification";
+		req.connection = "bpls-email-server"; 
+		req.message = '<br/>'+ param.message.toString().replaceAll('\n','<br/>'); 
+		req.refid = oapp.controlno; 
+		req.objid = 'SEQ'+ new java.rmi.server.UID(); 
+		req.dtsent = dynaSvc.lookup('DateService').getServerDate();
+
+		dynaEm.lookup('sys_email_queue').create( req ); 
+		return [status: "SUCCESS"]; 
+	}
+} 

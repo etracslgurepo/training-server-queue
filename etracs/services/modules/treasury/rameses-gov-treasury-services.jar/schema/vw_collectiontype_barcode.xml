@@ -1,0 +1,13 @@
+<schema>
+	<element tablename="vw_collectiontype_barcode">
+		<field name="objid" primary="true"/> 
+		<field name="state" caption="Status"/> 
+		<field name="name" caption="Name"/> 
+		<field name="title" caption="Title"/> 
+		<field name="formno" caption="FormNo"/> 
+		<field name="handler" caption="Handler"/> 
+		<field name="sortorder" caption="SortOrder"/> 
+		<field name="barcodekey" caption="BarcodeKey"/> 
+		<field name="queuesection" caption="QueueSection"/> 
+	</element>
+</schema>

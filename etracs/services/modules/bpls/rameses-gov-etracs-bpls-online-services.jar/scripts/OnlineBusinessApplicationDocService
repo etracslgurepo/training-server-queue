@@ -1,0 +1,377 @@
+import com.rameses.annotations.*;
+import com.rameses.ftp.FtpException;
+import com.rameses.ftp.FtpLocationConf;
+import com.rameses.ftp.FtpSession;
+
+class OnlineBusinessApplicationDocService {
+
+	final String DEFAULT_FILE_LOC_ID = 'bpls-fileserver'; 
+
+	@XConnection( dynamic=true )
+	def dynaConn; 
+
+	@DataContext( dynamic=true )
+	def dynaEm; 
+
+	@DataContext('online_business_application_doc')
+	def em_appdoc; 
+
+	@DataContext('online_business_application_doc_fordownload')
+	def em_download; 
+
+	@Service
+	def self; 
+
+	@Service( dynamic=true )
+	def dynaSvc; 
+
+
+	@ProxyMethod 
+	public def open( param ) {
+		def findby = [ objid: param.objid.toString() ]; 
+		def doc = em_appdoc.find( findby ).first(); 
+		if ( doc ) { 
+			def dd = findDownload( findby );
+			if ( dd ) doc.download = dd; 
+		}
+		return doc; 
+	} 
+
+	def findDownload( findby ) {
+		def dd = em_download.find( findby ).first(); 
+		if ( dd ) {
+			def progress = 0; 
+			if ( dd.filesize && dd.filesize > 0 ) {
+				def bytesprocessed = (dd.bytesprocessed ? dd.bytesprocessed : 0);
+				if ( bytesprocessed && bytesprocessed > 0 ) {
+					progress = (bytesprocessed / dd.filesize) * 100; 
+				}
+			}
+
+			dd.progress = new java.text.DecimalFormat("0").format( progress ) + "%"; 
+		} 
+		return dd; 
+	}
+
+	@ProxyMethod
+	public def getPendingDocs( param ) {
+		if ( !param.applicationid ) throw new Exception('applicationid  parameter is required');
+
+		def list = [];
+		def findby = [:]; 
+
+		em_appdoc.find([ parentid: param.applicationid ]).list().each{ o-> 
+			findby.objid = o.objid; 
+
+			def dd = findDownload( findby );
+			if ( dd ) { 
+				o.download = dd; 
+				list << o; 
+			}
+		}
+		return list; 
+	}
+
+
+
+	@Async
+	@ProxyMethod 
+	public void downloadAttachment( param ) {
+		if ( !param.objid ) return; 
+
+		def findby = [ objid: param.objid ]; 
+		def doc = em_appdoc.find( findby ).first(); 
+
+		if ( !doc ) { 
+			em_download.find( findby ).delete(); 
+			return; 
+		} 
+
+		def path = doc.attachment?.path; 
+		if ( !path ) { 
+			em_download.find( findby ).delete(); 
+			return; 
+		}
+
+		if ( doc.fs == null ) {
+			doc.fs = [:]; 
+		}
+
+		def rundate = dynaSvc.lookup('DateService', null).getServerDate(); 
+
+		def fileid = doc.fs.fileid; 
+		if ( !fileid ) { 
+			def fileloc = dynaEm.lookup('sys_fileloc').find([ objid: DEFAULT_FILE_LOC_ID ]).first(); 
+			if ( !fileloc ) throw new Exception("'"+ DEFAULT_FILE_LOC_ID +"'' sys_fileloc record not found"); 
+
+			def em_file = dynaEm.lookup('sys_file');
+			def em_fileitem = dynaEm.lookup('sys_fileitem'); 
+
+
+			def file = [:]; 
+			file.title = doc.doc.title; 
+			file.dtcreated = rundate; 
+			file.createdby = [ objid: 'SYSTEM', name: 'SYSTEM']; 
+			file.filetype = doc.fs.filetype; 
+			if ( !file.filetype ) file.filetype = ""; 
+
+			file = em_file.create( file ); 
+
+			def fileitem = [ parentid: file.objid ]; 
+			fileitem.objid = com.rameses.util.Encoder.MD5.encode( file.objid ); 
+			fileitem.dtcreated = file.dtcreated; 
+			fileitem.createdby = file.createdby; 
+			fileitem.caption = doc.attachment.name; 
+			fileitem.filelocid = fileloc.objid; 
+			fileitem.filetype = file.filetype;
+			fileitem.filesize = 0; 
+			fileitem.state = 'PENDING'; 
+			em_fileitem.create( fileitem ); 
+
+			doc.fs.fileid = file.objid; 
+			doc.fs.filelocid = fileloc.objid; 
+			em_appdoc.find( findby ).update([ fs: doc.fs ]); 
+		} 
+
+		updateSchedule( doc ); 
+
+		self.downloadAttachmentImpl_01( doc ); 
+	} 
+
+	@Async
+	@ProxyMethod 
+	public void updateSchedule( doc ) {
+		def rundate = dynaSvc.lookup('DateService', null).getServerDate();
+		
+		def pattern = "yyyy-MM-dd HH:mm:ss";  		
+		def formatter = new java.text.SimpleDateFormat( pattern ); 
+		def dateBean = new com.rameses.util.DateBean( rundate, pattern ); 
+		def mm = [ scheduledate: formatter.format( dateBean.add("10s")) ];
+
+		if ( doc.msg ) mm.msg = doc.msg; 
+		if ( doc.filesize ) mm.filesize = doc.filesize; 
+		if ( doc.bytesprocessed ) mm.bytesprocessed = doc.bytesprocessed; 
+
+		def em = dynaEm.lookup('online_business_application_doc_fordownload'); 
+		em.find([ objid: doc.objid ]).update( mm ); 
+
+		doc.remove('bytesprocessed'); 
+	}
+
+	@Async
+	@ProxyMethod 
+	public void updateDocStatus( param ) { 
+		if ( param.state ) { 
+			def fsparam = [ fs: [ state: param.state ]]; 
+
+			em_appdoc.find([ objid: param.objid ]).update( fsparam ); 
+		}
+	}
+
+	@Async
+	@ProxyMethod 
+	public void downloadAttachmentImpl_01( doc ) {	
+		def fileid = doc.fs.fileid; 
+
+		def em_fileitem = dynaEm.lookup('sys_fileitem'); 
+		def fileitem = em_fileitem.find([ parentid: fileid ]).first(); 
+		if ( !fileitem ) throw new Exception("'"+ fileid +"'' sys_fileitem record not found"); 
+
+		if ( fileitem.state.toString().toUpperCase() == 'COMPLETED') { 
+			em_download.find([ objid: doc.objid ]).delete(); 
+			return; 
+		}
+
+		def fileloc = dynaEm.lookup('sys_fileloc').find([ objid: fileitem.filelocid ]).first(); 
+		if ( !fileloc ) throw new Exception("'"+ fileitem.filelocid +"'' sys_fileloc record not found"); 
+
+		def file = dynaEm.lookup('sys_file').find([ objid: fileid ]).first(); 
+		if ( !file ) throw new Exception("'"+ fileid +"'' sys_file record not found"); 
+
+		def s3_conn = dynaConn.lookup('s3'); 
+		def doc_path = doc.attachment.path;
+		def url_path = s3_conn.buildPath( doc_path, true );
+		if ( doc_path.startsWith('/s3/')) {
+			url_path = 'http://'+ s3_conn.conf.get('viewer.relayhost') + doc_path;
+		}
+
+		def url_info = s3_conn.fetchURLInfo( url_path ); 
+		if ( url_info.error ) {
+			doc.filesize = 0; 
+			doc.bytesprocessed = 0; 
+			doc.msg = url_info.error; 
+			updateSchedule( doc ); 
+			return; 
+		}
+
+		if ( url_info.code != 200 ) {
+			// get and try the original location 
+			def em_app = dynaEm.lookup('online_business_application');
+			def parent = em_app.find([ objid: doc.parentid ]).select('objid,requirements').first(); 
+			
+			def docref_location = null;
+			if ( parent?.requirements instanceof List ) {
+				def docref = parent.requirements.find{( it.docid == doc.objid )} 
+				docref_location = docref?.attachment?.location; 
+			}
+
+			def err_msg = null; 
+			if ( docref_location ) {
+				def uinfo = s3_conn.fetchURLInfo( docref_location ); 
+				if ( uinfo.error ) {
+					err_msg = uinfo.error; 
+				}
+				else if ( uinfo.code != 200 ) {
+					err_msg = ""+ uinfo.code +" - "+ uinfo.message;
+				}
+
+				url_path = docref_location; 
+			
+			}
+			else {
+				err_msg = ""+ url_info.code +" - "+ url_info.message; 
+			}
+
+			if ( err_msg ) {
+				doc.filesize = 0; 
+				doc.bytesprocessed = 0; 
+				doc.msg = err_msg; 
+				updateSchedule( doc ); 
+				return; 
+			}
+		}
+
+
+		def url = new java.net.URL( url_path ); 
+		long filesize = getContentLength( url ); 
+
+		em_fileitem.find([ objid: fileitem.objid ]).update([ filesize: filesize ]); 
+
+		doc.msg = "";
+		doc.filesize = filesize; 
+		doc.bytesprocessed = 0; 
+		updateSchedule( doc ); 
+
+		def param = [url_path: url_path, fileloc: fileloc, fileitem: fileitem, file: file, doc: doc];
+		self.downloadAttachmentImpl_02( param ); 
+	} 
+
+	@Async
+	@ProxyMethod 
+	public void downloadAttachmentImpl_02( param ) { 
+		def url_path = param.url_path; 
+		def url = new java.net.URL( url_path ); 
+
+		def file = param.file; 
+		def fileloc = param.fileloc; 
+		def fileitem = param.fileitem; 
+
+		def doc_objid = param.doc.objid;
+
+		def remote_fileid = [ fileloc.rootdir, fileitem.objid ].findAll{( it )}.join('/'); 
+		remote_fileid = [ remote_fileid, file.filetype ].findAll{( it )}.join('.');
+
+		def conf = FtpLocationConf.add( fileloc.objid );
+		conf.setHost( fileloc.url ); 
+		conf.setUser( fileloc.user.name ); 
+		conf.setPassword( fileloc.user.pwd ); 
+
+        def sess = null; 
+        boolean pass = false; 
+        try {
+            sess = new FtpSession( conf ); 
+            sess.connect(); 
+            pass = true; 
+        }
+        catch( Throwable t ) {
+        	def err = getCause( t ); 
+        	param.doc.msg = err.message; 
+        }
+        finally {
+            if ( !pass ) {
+                disconnect( sess );
+            }  
+        }
+
+        if ( !pass ) {
+	        param.doc.bytesprocessed = 0; 
+			self.updateSchedule( param.doc );  
+			return;        	
+        }
+
+
+        param.doc.msg = ""; 
+		param.doc.bytesprocessed = 0; 
+		self.updateSchedule( param.doc ); 
+
+		self.updateDocStatus([ objid: doc_objid, state: 'PROCESSING']); 
+
+        def handler = [
+        	onTransfer: { filesize, bytesprocessed -> 
+        		self.updateSchedule([ objid: doc_objid, bytesprocessed: bytesprocessed ]); 
+        	},
+        	onComplete: {
+        	}
+        ] as FtpSession.Handler; 
+
+
+		pass = false; 
+        try { 
+        	sess.handler = handler;
+            sess.upload( remote_fileid, url ); 
+            pass = true; 
+        } 
+        catch(FtpException fe) { 
+            System.out.println("["+ getClass().getSimpleName() +"] "+ fe.getMessage());
+        }
+        finally {
+            disconnect( sess ); 
+        }
+
+        if ( pass ) { 
+	        def stat = [ state: 'COMPLETED' ];
+	        def findby = [ objid: fileitem.objid ];
+			dynaEm.lookup('sys_fileitem').find( findby ).update( stat ); 
+
+			findby.objid = doc_objid; 
+
+			em_download.find( findby ).delete();
+			em_appdoc.find( findby ).update([ fs: stat ]); 
+        } 
+	}
+
+    void disconnect( sess ) {
+        if ( sess != null ) {
+            try {
+                sess.disconnect(); 
+            } catch(Throwable t) {;} 
+        }
+    }	
+
+    long getContentLength( url ) {
+        def conn = null;
+        def httpConn = null; 
+        try {
+            conn = url.openConnection();
+            if (conn instanceof java.net.HttpURLConnection) {
+                httpConn = conn; 
+                httpConn.setRequestMethod("HEAD");
+            }
+            conn.getInputStream();
+            return conn.getContentLength(); 
+        } 
+        catch (java.io.IOException e) {
+            throw new RuntimeException(e);
+        } 
+        finally { 
+            try { httpConn.disconnect(); } catch(Throwable t){;} 
+        } 
+    } 
+
+    def getCause(Throwable t) {
+    	if ( t.cause ) { 
+    		return getCause( t.cause ); 
+    	} 
+    	return t; 
+    }
+} 

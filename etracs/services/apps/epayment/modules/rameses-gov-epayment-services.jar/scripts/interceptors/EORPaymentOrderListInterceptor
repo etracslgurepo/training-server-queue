@@ -1,0 +1,92 @@
+import com.rameses.annotations.*;
+
+class EORPaymentOrderListInterceptor { 
+	
+	@Service( dynamic=true )
+	def dynaSvc; 
+
+	@After(pattern="QueryService.getNodeList", eval="#{ args[0]._schemaname.toString().matches('eor_paymentorder.*') }")
+	public void afterGetNodeList( evt ) { 
+		def result = evt.result; 
+		result << [ id:'open', title: 'Open', _schemaname: 'eor_paymentorder' ];
+		result << [ id:'paid', title: 'Paid', _schemaname: 'eor_paymentorder_paid'];
+		result << [ id:'cancelled', title: 'Cancelled', _schemaname: 'eor_paymentorder_cancelled'];
+		result << [ id:'expired', title: 'Expired', _schemaname: 'eor_paymentorder'];
+	}
+
+	@Before(pattern="QueryService.getList", eval="#{ args[0]._schemaname == 'eor_paymentorder' }")
+	public void beforeGetOpenList( evt ) {
+		def param = evt.args[0];
+		if ( !param.node?.id ) return;
+
+        def wheres = []; 
+        def wheremap = [:]; 
+        if ( param.node.id == 'open' ) {
+        	def rundate = dynaSvc.lookup('DateService').getServerDate();
+        	rundate = new com.rameses.util.DateBean( rundate ).add("-1d");
+        	rundate = new java.text.SimpleDateFormat('yyyy-MM-dd').format( rundate ); 
+        	wheres << " expirydate >= :expirydate ";	
+        	wheremap.expirydate = rundate; 
+        }
+        else if ( param.node.id == 'expired' ) {
+        	def expdate = dynaSvc.lookup('DateService').getServerDate();
+        	expdate = new com.rameses.util.DateBean( expdate ).add("-1d");
+        	expdate = new java.text.SimpleDateFormat('yyyy-MM-dd').format( expdate ); 
+        	wheres << " expirydate < :expirydate ";	
+        	wheremap.expirydate = expdate; 
+        }
+
+        if ( param.searchtext ) {
+        	if ( param.searchtext.toString().indexOf('%') < 0 ) { 
+        		param.searchtext = param.searchtext.toString() +'%'; 
+        	}
+
+            wheremap.searchtext = param.searchtext; 
+            wheres << "(objid LIKE :searchtext OR controlno LIKE :searchtext OR paidby LIKE :searchtext)"
+        } 
+
+        if ( param.where ) {
+            wheres << param.where[0]; 
+            wheremap.putAll( param.where[1] ); 
+        }
+
+        param.where = [wheres.join(" AND "), wheremap]; 
+
+		def orderbys = [];
+		if ( param.node.id == 'UNRESOLVED' ) {
+			orderbys << 'txndate DESC'; 
+		} 
+		else {
+			orderbys << 'txndate'; 
+		}
+
+		if ( param.orderBy ) orderbys << param.orderBy; 
+
+		param.orderBy = orderbys.join(', '); 
+		orderbys.clear(); 
+	} 
+
+	@Before(pattern="QueryService.getList", eval="#{ args[0]._schemaname == 'eor_paymentorder_paid' }")
+	public void beforeGetPaidList( evt ) {
+		def param = evt.args[0];
+		if ( !param.node?.id ) return;
+
+		def orderbys = ['txndate desc'];
+		if ( param.orderBy ) orderbys << param.orderBy; 
+
+		param.orderBy = orderbys.join(', '); 
+		orderbys.clear(); 
+	} 	
+
+	@Before(pattern="QueryService.getList", eval="#{ args[0]._schemaname == 'eor_paymentorder_cancelled' }")
+	public void beforeGetCancelledList( evt ) {
+		def param = evt.args[0];
+		if ( !param.node?.id ) return;
+
+		def orderbys = ['txndate desc'];
+		if ( param.orderBy ) orderbys << param.orderBy; 
+
+		param.orderBy = orderbys.join(', '); 
+		orderbys.clear(); 		
+	} 	
+}

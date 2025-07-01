@@ -1,0 +1,44 @@
+import com.rameses.annotations.*;
+
+class BusinessBillItemTxnTypeListInterceptor {
+
+	@Before(pattern="QueryService.getList", eval="#{ args[0]._schemaname == 'business_billitem_txntype' }")
+	public void beforeGetList( evt ) {
+		def arg0 = evt.args[0];
+
+		def filters = [];
+		def filterMap = [:];
+		filterMap.role = arg0.role;
+		filterMap.domain = arg0.domain;
+
+		if ( arg0.role ) {
+			def filter_1 = new StringBuilder();
+			filter_1.append("( domain IN ('"); 
+			filter_1.append( arg0.role.toString() );
+			filter_1.append("') AND role IS NULL )");
+			filters << filter_1.toString();
+		}
+
+		def filter_2 = []; 
+		if ( arg0.domain ) {
+			filter_2 << "domain = :domain"; 
+		}
+		if ( arg0.role ) {
+			filter_2 << "role = :role"; 
+		}
+		if ( filter_2 ) {
+			filters << "("+ filter_2.join(" AND ") +")"; 
+		}
+
+		if ( filters ) {
+			def str = "("+ filters.join(" OR ") +")";
+			if ( arg0.where ) {
+				arg0.where[0] = str +" AND "+ arg0.where[0];	
+				arg0.where[1].putAll( filterMap );
+			}
+			else {
+				arg0.where = [str.toString(), filterMap];
+			}
+		}
+	} 
+} 

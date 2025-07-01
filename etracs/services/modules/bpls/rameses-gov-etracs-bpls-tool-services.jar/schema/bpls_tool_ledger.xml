@@ -1,0 +1,5 @@
+<schema>	
+	<element tablename="bpls_tool_ledger">
+		<field name="objid" primary="true"/>
+	</element>
+</schema>

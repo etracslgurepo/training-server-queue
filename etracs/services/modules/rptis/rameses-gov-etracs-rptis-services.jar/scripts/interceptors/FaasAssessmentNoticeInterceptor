@@ -1,0 +1,69 @@
+import com.rameses.annotations.*
+import com.rameses.common.*;
+import com.rameses.services.extended.*;
+
+class FaasAssessmentNoticeInterceptor
+{
+    @Service('Var')
+    def var
+
+	@Service('DateService')
+	def dtSvc
+
+	@Service('RPTUtil')
+	def util
+
+	@Service('RPTAssessmentNoticeService')
+	def svc 
+
+    @DataContext("faas_list")
+    def em_faaslist
+
+
+	@After(pattern="PersistenceService.read", eval="#{args[0]._schemaname=='assessmentnotice'}") 
+	public void afterOpen( evt ) {
+		def entity = evt.result 
+		entity.putAll(svc.open(entity))
+	}
+
+	@After(pattern="QueryService.getList", eval="#{args[0]._schemaname=='vw_assessment_notice'}") 
+	public void afterList( evt ) {
+		def list = evt.result 
+		def currdate = dtSvc.serverDate 
+		list.each {
+			if ('open'.equalsIgnoreCase(it.state )){
+	        	it.deliverydays = 31 - dtSvc.getDaysDiff(it.txndate, currdate) 
+	        	if (it.deliverydays < 0 ) {
+	        		it.deliverydays = 0
+	        	}
+        	} else {
+        		it.deliverydays = null 
+        	}
+		}
+	}
+
+    @Before(pattern="RPTCertificationService.createCertification", eval="#{args[0].opener == 'tdtruecopy'}") 
+	public void validateCreateTaxDecTrueCopy( evt ) {
+		def certification = evt.args[0]
+        if (!'tdtruecopy'.equalsIgnoreCase(certification.opener)) return;
+        if (!util.isTrue(var.rptcertification_truecopy_require_released_noa)) return;
+
+        def faas = em_faaslist.select('objid,rputype,txntype.*,ry')
+                .find([objid: certification.faasid])
+                .first()
+        if (!faas) throw new Exception('FAAS does not exist or has already been deleted.\nPlease verify.')
+
+        def includedry = util.toInteger(var.rptcertification_truecopy_require_released_noa_ry)
+        if (!includedry || includedry == 0 || faas.ry < includedry) return;
+
+        if ('GR'.equalsIgnoreCase(faas.txntype.objid)) return;
+
+        if (!svc.isNoaDelivered([objid: certification.faasid])) {
+            def msg = 'Certified True Copy cannot be issued as the\n'
+            msg += 'Notice of Assessment has not yet been received or delivered.';
+            throw new Exception(msg)
+        }
+	}
+
+}
+

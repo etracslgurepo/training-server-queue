@@ -1,0 +1,22 @@
+import com.rameses.annotations.*;
+import com.rameses.util.*;
+
+class SysMessageQueueTask {
+
+	boolean processing = false;
+
+	@Service(dynamic=true)
+	def dynSvc;
+
+
+	@Schedule(interval=3)
+	public void sendSimpleEmail( task ) {
+		if(processing) return;
+		processing = true;
+		def svc = dynSvc.lookup("SysMessageQueueService");
+		svc.sendToEmail();
+		processing = false;
+				
+	} 
+
+}

@@ -1,0 +1,32 @@
+import com.rameses.annotations.*
+import com.rameses.eserver.*;
+import com.rameses.common.*;
+
+class BatchGRInterceptor
+{
+    @DataContext('batchgr') 
+    def em_batchgr
+
+    @DataContext('batchgr_item') 
+    def em_batchgr_item 
+	
+	@Before(pattern="FAASService.deleteFaas") 
+	public void resetBatchItem( evt ) {
+		def faas = evt.args[0]
+		em_batchgr_item.where('newfaasid = :objid', [objid: faas.objid])
+				.update([state:'FORREVISION', newfaasid:null])
+	}
+
+	@After(pattern="FAASService.approveFaas") 
+	public void approveBatchItem( evt ) {
+		def faas = evt.args[0]
+
+		def batchitem = em_batchgr_item.find([newfaasid: faas.objid]).first() 
+		if (!batchitem) return 
+		
+		batchitem.state = 'CURRENT'
+		em_batchgr_item.update(batchitem)
+	}
+
+}
+

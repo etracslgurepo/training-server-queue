@@ -1,0 +1,42 @@
+import com.rameses.annotations.*
+
+class EPaymentPartnerService   {
+
+    @Service( dynamic=true )
+    def dynaSvc; 
+
+    @DataContext( dynamic=true )
+    def dynaEm;
+
+    @DataContext("paymentpartner")
+    def pmtPartnerEm;
+
+
+    @ProxyMethod
+    public def syncPaymentPartners() {
+        def cloudQuerySvc = dynaSvc.lookup('epayment/QueryService', 'cloud-server');
+
+        def param = [_schemaname: "payment_partner"];
+        param.select = 'objid,code,name'; 
+        param.where = ["1=1"]; 
+        
+        def list = cloudQuerySvc.getList( param ); 
+        def em = dynaEm.lookup('paymentpartner'); 
+
+        list.each {
+            def findPK = [ objid: it.objid ]; 
+            def partner = em.find( findPK ).first();
+            if ( partner ) { 
+                em.find( findPK ).update( it ); 
+            }
+            else { 
+                def p = [:];
+                p.putAll( it );
+                p.indexno = it.code;
+                em.create( p );
+            }
+        }
+        return list; 
+    }
+
+}

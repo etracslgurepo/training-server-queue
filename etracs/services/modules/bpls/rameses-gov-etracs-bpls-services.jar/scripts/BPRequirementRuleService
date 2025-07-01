@@ -1,0 +1,56 @@
+import com.rameses.annotations.*;
+import com.rameses.util.*;
+import java.rmi.server.*;
+import com.rameses.rules.common.*;
+
+import bpls.facts.*;
+import bpls.actions.*;
+
+public class BPRequirementRuleService  {
+
+	@Service( dynamic=true )
+	def dynaSvc; 
+
+	@Resource("RuleService")	
+	def ruleSvc;
+
+	@ActiveDB("rule")
+	def ruleDB;
+
+	@Service("BusinessRequirementTypeService")
+	def br;
+
+	@Env
+	def env;
+
+	String RULESET = "bprequirement";
+
+	def buildActions(def request) {
+		def actions = new RuleAction();
+		actions.addCommand( "add_requirement", new AddRequirement(request:request, BR: br));
+		actions.addCommand( "print_test", new PrintTest());
+		return actions;
+	}
+
+	@ProxyMethod
+	public def execute(def o) throws Exception { 
+		def unexpiredList = o.unexpiredrequirements; 
+		if ( unexpiredList == null ) { 
+			unexpiredList = []; 
+		} 
+		
+		def request = [entity: o, requirements:[], facts:env.facts ]; 
+		request.actions = buildActions( request );
+		def grps = ruleDB.getRulegroups( [ruleset: RULESET] );
+		for( g in grps ) {
+			ruleSvc.execute( RULESET, request.facts, request.actions, g.name );
+		}
+
+		request.requirements.each{ req-> 
+			def ul = unexpiredList.find{( it.reftype == req.reftype )} 
+			if ( ul ) req.putAll( ul ); 
+		}
+
+		return [requirements: request.requirements];
+	}
+}

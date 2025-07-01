@@ -1,0 +1,39 @@
+import com.rameses.annotations.*;
+
+class BplsFeeBFPService {
+
+	@DataContext( dynamic=true )
+	def dynaEm;
+
+	@ProxyMethod 
+	public def getList( def param ) { 
+		def em = dynaEm.lookup('bpls_fee_bfp'); 
+		return em.getList( param ); 
+	}
+
+	@ProxyMethod 
+	public void updateStatus( def param ) { 
+		if ( !param?.objid ) 
+			throw new Exception('objid  parameter is required'); 
+		if ( param?.state == null ) 
+			throw new Exception('state  parameter is required'); 
+		if ( !(param.state instanceof Number)) 
+			throw new Exception('state must be an instance of a Number'); 
+
+		if ( param.state == 0 ) {
+			// set to unpaid status 
+		}
+		else if ( param.state == 1 ) {
+			// set to paid status 
+		}
+		else {
+			throw new Exception('Invalid value. State can only be 1 or 0'); 
+		}
+
+		def em = dynaEm.lookup('bpls_fee_bfp'); 
+		def info = em.findFee( param ); 
+		if ( !info ) throw new Exception("BFP fee record not found"); 
+
+		em.updateFee( param );
+	} 
+} 

@@ -1,0 +1,31 @@
+import com.rameses.annotations.*;
+
+class EORRemittanceAbstractRptcReportService {
+
+	@Service(value='EorLandTaxReportAbstractTaxCollectionService', connection='rpt')
+	def svc; 
+
+	@Env 
+	def env; 
+
+
+	@ProxyMethod
+	public def getAbstractRptcDetail(params) {
+		return svc.getAbstractRptcDetail(params)
+	}
+
+	@ProxyMethod
+	public def getAbstractRptcByRemittance( entity, municityname ) {
+		return svc.getAbstractRptcByRemittance( entity, municityname )
+	}
+
+	@ProxyMethod
+	public def getAbstractRptcSummary( entity ) {
+		return svc.generateAbstractOfRPTCollectionSummary(entity)
+	}
+
+	@ProxyMethod 
+	public def getMuniCityByRemittance( remittanceid ) {
+		return svc.getMuniCityByRemittance(remittanceid)
+	}
+}

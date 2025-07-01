@@ -1,0 +1,37 @@
+import com.rameses.annotations.*;
+
+class BfpBusinessApplicationWorkflowInterceptor {
+
+	@DataContext( dynamic=true )
+	def dynaEm;
+
+	@After(pattern="BusinessApplicationWorkflowService.validateBeforeSignal")
+	public void validateBeforeSignal( evt ) { 
+		def task = evt.args[0];
+		if ( task.state.toString().toLowerCase() == 'bfp' ) {
+			def _action = task.action.toString().toLowerCase(); 
+			def _target = task.to.toString().toLowerCase();
+			if ( _action == 'submit' && _target == 'payment' ) {
+				def em = dynaEm.lookup('bpls_fee_bfp'); 
+				def mm = [ applicationid: task.refid, tag: task.role ]; 
+				def fee = em.getList( mm ).find{((it.paid ? it.paid : 0) == 0)} 
+				if ( fee ) { 
+					throw new Exception("Found 1 fee that is still unpaid. Please review the BFP Fees"); 
+				} 
+			}
+		}
+	} 
+
+	@After(pattern="BusinessApplicationWorkflowService.notifyAfterCreateTask")
+	public void notifyAfterCreateTask( evt ) { 
+		def task = evt.args[0];
+		if ( task.state.toString().toLowerCase() == 'bfp' ) {
+			def em = dynaEm.lookup('bpls_fee_bfp'); 
+			def mm = [ applicationid: task.refid, tag: task.role ]; 
+			em.getList( mm ).each{ o-> 
+				em.updateFee([ objid: o.objid, state: 1 ]); 
+			}
+		} 
+	} 
+
+} 

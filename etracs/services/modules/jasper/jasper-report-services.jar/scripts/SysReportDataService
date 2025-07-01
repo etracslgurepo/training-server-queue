@@ -1,0 +1,46 @@
+import com.rameses.annotations.*;
+
+import groovy.text.*;
+import java.util.regex.*;
+import com.rameses.osiris2.reports.*;
+import com.rameses.osiris3.sql.*;
+import groovy.lang.GroovyShell;
+import groovy.lang.Script;
+import org.codehaus.groovy.runtime.InvokerHelper;
+import com.rameses.util.*;
+
+class SysReportDataService {
+	
+	@Service("QueryService")
+	def qrySvc;
+
+	@Service(dynamic=true)
+	def dynSvc;
+
+	@DataContext(dynamic=true)
+	def dynEm;
+
+	@ProxyMethod
+	def getData( def o ) {
+		if(!o.statement) throw new Exception("statement is required in SysReportDataService.getData");
+		if(o.params == null) throw new Exception("params is required in SysReportDataService.getData");
+		
+		try {
+			GroovyShell shell = new GroovyShell();
+		    def script = shell.parse(o.statement);
+		    groovy.lang.Binding bnd = new groovy.lang.Binding();
+		    bnd.setVariable( "QRY", qrySvc );
+		    bnd.setVariable( "SERVICE", dynSvc );
+		    bnd.setVariable( "PARAMS", o.params);
+		    bnd.setVariable( "EM", dynEm );
+		    Script s = InvokerHelper.createScript( script.getClass(), bnd);
+			return s.run();
+		}
+		catch(ex) {
+			def cause = ExceptionManager.instance.getOriginal(ex); 
+			throw new Exception("Error in SysReportData.getData " + cause?.message );
+		}
+	}
+	    
+}
+

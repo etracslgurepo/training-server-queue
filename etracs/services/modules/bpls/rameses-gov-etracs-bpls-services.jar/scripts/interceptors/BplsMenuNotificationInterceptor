@@ -1,0 +1,17 @@
+import com.rameses.annotations.*; 
+
+class BplsMenuNotificationInterceptor {
+	
+	@DataContext( dynamic=true )
+	def dynaEm;
+
+	@After(pattern="MenuNotificationService.getCount", eval="#{args[0].notificationid == 'onlinebpls_open_app'}")
+	public void loadOnlineBplsOpenApp( def evt ) {
+		def param = evt.args[0];
+		def em = dynaEm.lookup('vw_online_business_application');
+		def rec = em.findOpenCount(); 
+		if ( rec?.txncount ) { 
+			evt.result.count = rec.txncount; 
+		}
+	}
+}

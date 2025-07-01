@@ -1,0 +1,13 @@
+<schema>
+	<element tablename="vw_entitymultiple">
+		<field name="objid" primary="true"/>
+		<field name="entityno" caption="EntityNo"/>
+		<field name="entityname" hidden="true" visible="false" searchable="true"/>
+		<field name="name" caption="Name" hidden="true" />
+		<field name="address_objid" hidden="true" visible="false" />
+		<field name="address_text" caption="Address" />
+		<field name="type" caption="Type" hidden="true" />
+		<field name="state" caption="State" />
+		<field name="fullname" caption="FullName" />
+	</element>	
+</schema>

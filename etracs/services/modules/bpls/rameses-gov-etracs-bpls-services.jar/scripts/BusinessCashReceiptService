@@ -1,0 +1,189 @@
+import com.rameses.annotations.*;
+import com.rameses.util.*;
+import java.rmi.server.*;
+import com.rameses.services.extended.*
+
+public class BusinessCashReceiptService  {
+
+	@ActiveDB("business_receivable")
+	def receivable;
+
+	@ActiveDB("business")
+	def business;
+
+	@DataContext("business_application")
+	def appEm;
+
+	@Service("BusinessBillingService")
+	def billingSvc;
+	
+	@Service("BusinessLobService")
+	def lobSvc;
+	
+	@Service("BusinessTaxCreditService")
+	def taxCreditSvc;
+
+	@Service("NumberService")
+	def numSvc;
+
+	@Service("DateService")
+	def dateSvc;
+
+
+	@ProxyMethod
+	public def getBusinessList(o) {
+		def mm = [:]; 
+		if ( o.bin ) mm.bin = o.bin;
+		if ( o.ownername ) mm.ownername = o.ownername; 
+		if ( o.tradename ) mm.tradename = o.tradename; 
+		if ( o.businessname ) mm.businessname = o.businessname; 
+
+		if ( mm.isEmpty()) return []; 
+
+		def sb = new StringBuilder();
+		if ( mm.bin ) {
+			mm.bin += "%";
+			sb.append( ''' AND b.bin LIKE $P{bin} ''' );
+		}	
+		if ( mm.businessname ) {
+			mm.businessname += "%";
+			sb.append( ''' AND b.businessname LIKE $P{businessname} ''' );
+		}
+		if ( mm.tradename ) {
+			mm.tradename += "%";
+			sb.append( ''' AND b.tradename LIKE $P{tradename} ''' );
+		}
+		if ( mm.ownername ) {
+			mm.ownername += "%";
+			sb.append( ''' AND b.owner_name LIKE $P{ownername} ''' );
+		} 
+		mm.filter = sb.toString();
+		return receivable.getBusinessListForBilling( mm );
+	}
+
+	@ProxyMethod
+	public def getAppList( params ) { 
+		if ( !params.businessid ) throw new Exception("businessid must not be null"); 
+
+		return receivable.getAppListForBilling( params ); 
+	} 
+
+	@ProxyMethod 
+	public def findInfo( param ) { 
+		def info = null; 
+		if ( param.appno ) { 
+
+			def sappno = param.appno;
+			if ( sappno.indexOf(':') > 0 ) { 
+				param.appno = sappno.substring( sappno.indexOf(':')+1); 
+				sappno = param.appno;
+			}
+			if ( sappno.contains('-')) { 
+				info = appEm.findInfoByAppno( param ); 
+			} else { 
+				info = appEm.findInfoByBIN([ bin: sappno ]); 
+			} 
+
+			if ( !info ) throw new Exception("Business record not found with refno " + sappno);
+
+		} else if ( param.applicationid ) {
+			info = appEm.findInfoByAppid( param ); 
+			if ( !info ) throw new Exception("Business record not found with applicationid " + param.applicationid);
+		} 
+
+
+		if (!info.state.toLowerCase().matches('payment|release|completed')) 
+			throw new Exception('This application is not available for payment. Current state is ' + info.state);  
+
+		def m = [:];
+		m.payer = info.owner;
+        m.paidby = info.owner.name + ' ('+info.businessname+')';
+        m.paidbyaddress = info.address?.text;
+        m.businessid = info.business?.objid;
+        m.applicationid = info.objid;
+        m.apptype = info.apptype;
+        m.appyear = info.appyear;
+        m.appno = info.appno; 
+        m.dtfiled = info.dtfiled;
+        m.bin = info.bin;
+
+        if(m.apptype!='ADDITIONAL') {
+	        def list = appEm.getDelinquentApplications([ businessid: m.businessid, appyear: m.appyear ]); 
+	        if ( list ) {
+	        	def dapp = list.first(); 
+	        	throw new Exception('This business is delinquent in '+ dapp.iyear +'. Please verify.'); 
+	        }
+        }
+        return m; 
+	}
+
+
+	@ProxyMethod 
+	public def getBillingForPayment( param ) { 
+		if (!param.applicationid) throw new Exception('applicationid is required');
+
+		def r = [applicationid: param.applicationid];
+		r.filter = ''' ba.objid =$P{applicationid} ''';
+		r.show_paid = false;
+		r.taxfees = receivable.getBilling(r);
+		if ( !r.taxfees ) {  
+			String errmsg = "No unpaid items found"; 
+			if ( param._silent == true ) {
+				return [ errcode:'NO_UNPAID', errmsg: errmsg ]; 
+			} 
+
+			throw new Exception( errmsg );
+		} 
+
+		if ( param.payment?.option.toString().toUpperCase() == 'SPECIFY-AMOUNT' ) {
+			if ( param.payment?.txnmode.toString().toUpperCase() == 'CAPTURE' ) {
+				// accepts the partial payment request 
+			} 
+			else if ( r.taxfees.find{( it.iyear != it.appyear )} ) {
+				throw new Exception(""" 
+					Partial payment is not allowed for this type of application. 
+					Please use the quarterly option instead.
+				""".trim());
+			}
+		}
+
+		r.taxfees.eachWithIndex{ o,idx-> 
+			o.sortorder = idx; 
+		}
+
+		r.app = param.app; 
+		if ( r.app ) {
+			r.app.objid = r.applicationid; 
+		}
+
+		r.billdate = param.billdate; 		
+		r.payment = param.payment; 
+		if ( !r.payment ) { 
+			r.payment = [option:'FULLYEAR']; 
+		} 
+		if ( r.payment.option == 'FULLQTR' ) {
+			r.payment.year = r.app.appyear;
+		}
+
+		def z = billingSvc.getBillingForPayment( r );
+
+		def m = [:]; 
+		m.expirydate = z.expirydate;
+		m.nextbilldate = z.expirydate; 
+
+		if ( param._with_taxfees == false ) {
+			//do nothing 
+		} else {
+			m.taxfees = z.taxfees.sort{ it.sortorder } 
+		}
+		if ( param._with_items == false ) {
+			//do nothing 
+		} else {
+			m.items = z.items.sort{ it.sortorder };
+		}
+		
+		m.totals = z.totals;
+		m.excess = z.excess;
+		return m;
+	} 
+}

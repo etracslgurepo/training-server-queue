@@ -1,0 +1,13 @@
+import com.rameses.annotations.*;
+
+class SysOrgService {
+
+	@DataContext('sys_org')
+	def orgEm;
+
+	@ProxyMethod 
+	public def findRootOrg() { 
+		return orgEm.findRoot(); 
+	}
+
+}

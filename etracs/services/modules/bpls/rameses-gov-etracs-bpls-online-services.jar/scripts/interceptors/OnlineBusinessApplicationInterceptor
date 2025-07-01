@@ -1,0 +1,130 @@
+import com.rameses.annotations.*;
+
+class OnlineBusinessApplicationInterceptor {
+
+	@DataContext( dynamic=true )
+	def dynaEm;
+
+	@Service( dynamic=true )
+	def dynaSvc;
+
+
+	@After(pattern="PersistenceService.read", eval="#{ args[0]._schemaname == 'online_business_application' }")
+	public void afterRead( evt ) { 
+		def res = evt.result; 
+
+		def em = dynaEm.lookup('vw_online_business_application'); 
+		def app = em.select('objid,owner.*').find([ objid: res.objid ]).first(); 
+		res.taxpayerid = app.owner?.objid; 
+		resolveData( evt ); 
+	} 
+
+	@After(pattern="PersistenceService.read", eval="#{ args[0]._schemaname == 'vw_online_business_application' }")
+	public void afterReadVW( evt ) { 
+		def res = evt.result;
+
+		def ownerid = res.owner?.objid; 
+
+		// load data from the actual table 
+		def em = dynaEm.lookup('online_business_application'); 
+		def app = em.find([ objid: res.objid.toString() ]).first(); 
+		if ( app ) res.putAll( app ); 
+
+		res.taxpayerid = ownerid; 
+		resolveData( evt ); 
+	} 
+
+
+	@After(pattern="BusinessApplicationService.open", index=1) 
+	public void afterOpen( evt ) {
+		def app = evt.result; 
+		if ( !app ) return; 
+
+		app.isonline = false; 
+
+		def em = dynaEm.lookup('online_business_application'); 
+		em.select('objid,state,control,dtcreated,contact.*');
+		
+		app.onlineapplication = em.find([ objid: app.objid.toString() ]).first(); 
+		if ( app.onlineapplication?.objid ) {
+			app.isonline = true; 
+		}
+	} 
+
+
+	void resolveData( evt ) {
+		def res = evt.result;
+
+		if ( res.datainfo instanceof Map ) {
+			if ( !res.orgtype ) { 
+				res.orgtype = res.datainfo.orgtypeid; 
+			} 
+			if ( !res.taxpayerid ) {
+				res.taxpayerid = res.datainfo.taxpayerid; 
+			}
+		}
+
+		if ( res.owner instanceof Map ) {
+			res.owner.objid = res.taxpayerid; 
+		}
+
+		if ( !res.permittype ) res.permittype = 'BUSINESS'; 
+
+		def dec_formatter = new java.text.DecimalFormat('#,##0.00'); 
+		def int_formatter = new java.text.DecimalFormat('#,##0'); 
+
+		res.infos.each{ o-> 
+			o.displayValue = o.value;
+			if ( !o.value ) return; 
+
+			def datatype = o.datatype.toString().toLowerCase();
+			if ( datatype == 'decimal' ) { 
+				if ( !(o.value instanceof Number)) {
+					o.value = new BigDecimal( o.value.toString()); 
+				} 
+
+				o.displayValue = dec_formatter.format( o.value ); 
+
+			}
+			else if ( datatype == 'integer' ) {
+				if ( !(o.value instanceof Number)) {
+					o.value = new BigDecimal( o.value.toString()).intValue(); 
+				}
+				o.displayValue = int_formatter.format( o.value ); 
+			}
+			else if ( datatype == 'boolean' && o.value ) {
+				o.displayValue = (o.value.toString().matches('true|1') ? 'yes' : 'no');
+			}
+		}
+
+		res.infos.sort{ it.caption }
+
+		def lob_ids = res.lobs.collect{ it.lob.objid }.findAll{( it )}
+		if ( lob_ids ) {
+			def queryParam = [_schemaname: 'lob']; 
+			queryParam.where = "objid IN ('"+ lob_ids.join("','") +"')";
+			
+			def querySvc = dynaSvc.lookup('QueryService'); 
+			querySvc.getList( queryParam ).each{ o-> 
+				res.lobs.findAll{( it.lob.objid == o.objid )}.each{
+					it.lob.psic = o.psic; 
+				}
+			}
+		}
+
+		if ( res.apptype == 'NEW' && res.state == 'OPEN' ) {
+			def svc = dynaSvc.lookup('bpls/OnlineAppNewService'); 
+			if ( res.business == null ) res.business = [:]; 
+			
+			res.business.owner = svc.buildOwner( res ); 
+
+			if ( res.taxpayerid ) {
+				def filter = [ objid: res.taxpayerid ]; 
+				filter._schemaname = 'entity'+ res.business.owner.type.toLowerCase(); 
+
+				svc = dynaSvc.lookup('PersistenceService'); 
+				res.taxpayer = svc.read( filter );  
+			}
+		}
+	} 
+}

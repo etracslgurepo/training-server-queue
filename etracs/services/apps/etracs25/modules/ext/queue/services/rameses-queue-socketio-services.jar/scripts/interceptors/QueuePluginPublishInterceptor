@@ -1,0 +1,26 @@
+import com.rameses.annotations.*;
+import com.rameses.http.BasicHttpClient;
+import com.rameses.osiris3.server.JSON;
+
+class QueuePluginPublishInterceptor {
+
+	@XConnection('queue-socketio')
+	def xconn;
+
+	@After( pattern="UserQueueService.afterPublishData" ) 
+	public void afterPublishData( evt ) { 
+		def data = evt.args[0]; 
+		if ( !data ) return; 
+
+		def enabled = System.getenv("queue_socketio_enabled").toString().matches("true|yes|1"); 
+		if ( !enabled ) return; 
+
+		def conf = xconn.conf;
+		def url = "http://"+ conf['app.host'] + conf['service.path']; 
+
+		def jsonStr = new JSON().encode( data ); 
+		def httpc = new BasicHttpClient();
+		httpc.setContentType("application/json");
+		httpc.post( url, jsonStr ); 
+	} 
+}

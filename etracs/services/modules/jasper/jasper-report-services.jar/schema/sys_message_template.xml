@@ -1,0 +1,13 @@
+<schema>
+	<element tablename="sys_message_template">
+		<field name="objid" primary="true" searchable="true" visible="true"/>
+		<field name="subject" required="true"/>		
+		<field name="message" required="true"/>
+		<field name="statement" required="true"/>
+		<field name="emailfield"/>
+		<field name="mobilenofield"/>
+		<!-- mail connection -->
+		<field name="connection" required="true"/>
+	</element>
+</schema>
+

@@ -1,0 +1,16 @@
+<schema>
+	<element tablename="vw_entity">
+		<field name="objid" primary="true"/>
+		<field name="entityno" caption="EntityNo" indexed="true" searchable="true"/>
+		<field name="entityname" caption="EntityName" indexed="true" searchable="true"/>
+		<field name="address_objid" visible="false"/>
+		<field name="address_text" caption="Address"/>
+		<field name="name" caption="Name" />
+		<field name="type" caption="Type"/>
+		<field name="remarks" />
+		<field name="mobileno" />
+		<field name="phoneno" />
+		<field name="email" />
+		<field name="state" caption="State"/>
+	</element>
+</schema>

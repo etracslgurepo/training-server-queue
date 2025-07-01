@@ -1,0 +1,146 @@
+import com.rameses.annotations.*;
+import com.rameses.common.*;
+import java.rmi.server.UID;
+import com.rameses.util.*;
+
+class RuleLoaderService {
+
+
+	@Resource('RuleService')
+	def ruleSvc; 
+
+	@ActiveDB('rule')
+	def ruleDB;
+	
+	@Context
+	def appContext;
+	
+	@Resource('TemplateService')
+	def templateSvc; 
+	
+	@Cache
+	def cache;
+	
+	@Schedule
+	public void loadRules(tsk) {
+		try {
+			println "LOADING RULES V2: Started";
+			com.rameses.server.ServerPID.add('RuleLoaderService');
+			loadRulesImpl(tsk);
+			println "LOADING RULES V2: Finished";
+		} catch(e) {
+			throw e;
+		} finally {
+			com.rameses.server.ServerPID.remove('RuleLoaderService');
+		} 
+	} 
+	
+	private void loadRulesImpl(tsk) {
+		//def rulesets = ruleDB.getRulesets()*.name;
+		//we retrieve rulesets based on the loaded folders so it will be pluggable.
+
+		def rulesetConf = [:];
+		loadConfs( rulesetConf ); 
+
+		def rulesetFiles = [];
+		def rulesetFileHandler = { m->
+			def path = m.url.getFile().replaceAll("/+", "/");
+			int idx = path.lastIndexOf( "/rulesets/" ); 
+			m.group = path.substring(0, idx); 
+
+			def conf = rulesetConf.get( m.group ); 
+			rulesetFiles << [
+				groupname: m.group,
+				filename: m.filename, 
+				sortorder: ( conf?.sortorder ? conf.sortorder : 100 )
+			];
+		} as ScanFileFilter;
+
+		appContext.scanFiles( "rulesets", rulesetFileHandler, null );
+		rulesetFiles.unique(); 
+		rulesetConf.clear(); 
+
+		def list = []; 
+		def groups = rulesetFiles.groupBy{ it.sortorder }
+		groups.each{ k,v-> 
+			list << k; 
+		}
+		rulesetFiles.clear(); 
+
+		def rulesets = []; 
+
+		list.unique().sort{ it } 
+		list.each{ idx-> 
+			groups.get( idx ).sort{ it.groupname }  
+			groups.get( idx ).groupBy{ it.groupname }.each{ k,v-> 
+				v.sort{ it.filename } 
+				v.each{ 
+					rulesets << it.filename; 
+				}
+			}
+		}
+		groups.clear();
+		list.clear();
+
+		def readers = null;
+		def loadrules = { m->
+			try {
+				readers << new InputStreamReader(m.url.openStream());
+			}
+			catch( Throwable t ) { 
+				println "error load " + e.message; 
+			}
+		} as ScanFileFilter;
+		
+		//loading rule sequence. file facts and rules. db rules
+		rulesets.each { rs->
+			println "loading rule " + rs;
+			readers = [];
+
+			/** load facts definition from file and db **/
+			appContext.scanFiles( "rulesets/"+rs+"/facts", loadrules, ".*\\.drl");
+
+			/** load rules from file and db **/
+			appContext.scanFiles( "rulesets/"+rs+"/rules", loadrules, ".*\\.drl");
+
+			ruleDB.getRulesForDeployment( [ruleset:rs] ).each{ r->
+				try {
+					String s = r.ruletext.toString().trim();
+					readers << new java.io.StringReader( s );
+				} catch(Throwable e) { 
+					e.printStackTrace(); 
+				} 
+			}
+
+			try { 
+				ruleSvc.buildRuleContext(rs, readers); 
+			} catch(Throwable e) {
+				e.printStackTrace();
+			} 
+
+			readers.clear(); 
+		}
+		rulesets.clear(); 
+	} 
+
+	void loadConfs( def map ) {
+		def getProps = { url-> 
+			def props = new Properties();
+			try { 
+				props.load( url.openStream() ); 
+				props.sortorder = Integer.parseInt( props.get("sortorder").toString()); 
+			} 
+			catch(Throwable t) { 
+				props.sortorder = 100;
+			} 
+			return props;
+		}
+
+		appContext.getClassLoader().getResources( "ruleset.conf" ).each{ url-> 
+			def path = url.getFile().replaceAll("/+", "/");
+			int idx = path.lastIndexOf('/'); 
+			def name = path.substring(0, idx); 
+			map.put(name, getProps( url )); 
+		}
+	}
+}

@@ -1,0 +1,24 @@
+import com.rameses.annotations.*
+
+class EORManualPostingInterceptor {
+
+    @DataContext( dynamic=true )
+    def dynaEm; 
+
+    
+    @Before(pattern="PersistenceService.removeEntity", eval="#{ args[0]._schemaname == 'eor_manual_post' }")
+    public void beforeRemove( evt ) {
+        def param = evt.args[0];
+
+        def pmt = dynaEm.lookup('eor_manual_post').find([ objid: param.objid.toString() ]).first();
+        if ( !pmt ) throw new Exception("eor_manual_post record not found");
+
+        def eor = dynaEm.lookup('eor').find([ paymentrefid: pmt.paymentorderno ]).first(); 
+        if ( eor ) throw new Exception("The EOR record with reference number "+ eor.receiptno +" must be reverted first.");
+    } 
+
+    @After(pattern="PersistenceService.removeEntity", eval="#{ args[0]._schemaname == 'eor_manual_post' }")
+    public void afterRemove( evt ) {
+
+    } 
+}

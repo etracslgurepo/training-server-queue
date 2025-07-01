@@ -1,0 +1,3 @@
+provider=conf
+app.host=${queue_socketio_ip}:3000
+service.path=/api/queue

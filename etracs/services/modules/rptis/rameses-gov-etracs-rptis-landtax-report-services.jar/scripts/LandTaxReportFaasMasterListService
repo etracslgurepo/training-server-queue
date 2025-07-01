@@ -1,0 +1,140 @@
+import com.rameses.annotations.*
+import com.rameses.common.*;
+import com.rameses.services.extended.*;
+
+class LandTaxReportFaasMasterListService
+{
+	@Env 
+	def env 
+
+    @ActiveDB('landtaxreport_faas_list')
+    def em
+
+    @DataContext('propertyclassification')
+    def propertyclassification
+
+    @DataContext('faas_previous')
+    def em_faas_previous 
+
+    @Service('DateService')
+    def dtSvc 
+
+    @Service('RPTUtil')
+    def util
+
+    
+
+    @Async
+    @ProxyMethod
+    public def getReportData( params ) {
+		buildFilters(params)
+		buildTitle(params)
+
+		def list = em.getList(params)
+		if( ! list ) throw new Exception('Record not found.')
+		
+        list.each{
+			def prevlist = em_faas_previous.find([faasid:it.objid]).list()
+            if (prevlist){
+                it.prevowner = prevlist.prevowner.join(' / ')
+                it.prevadministrator = prevlist.prevadministrator.join(' / ')
+                it.prevmv = prevlist.prevmv.join(' / ')
+                it.prevav = prevlist.prevmv.join(' / ')
+            }
+
+			if (it.administrator && it.administrator.name){
+				it.owner.name = it.owner.name + '\nAdmin: ' + it.administrator.name 
+			}
+			
+			if (!it.prevowner)
+				it.prevowner = ''
+				
+			if (it.prevadministrator){
+				it.prevowner += '\nAdmin: ' + it.prevadministrator 
+			}
+		}
+
+		def forlguname = env.ORGCLASS + ' OF ' + env.ORGNAME 
+		if (params.lgu) {
+			forlguname = params.lgu.lgutype.toUpperCase() + ' OF ' + params.lgu.name 
+		}
+
+		def p = [
+			CLASSIFICATION : (params.classification ? params.classification.name  :  'ALL'),
+            FORLGUNAME : forlguname,
+            TITLE    : params.title,
+        ]
+
+		return [
+			parameters  : p,
+			reportdata 	: list
+		]
+    }
+
+    @ProxyMethod
+    public def getClassifications(){
+    	return propertyclassification.find([state:'APPROVED']).orderBy('orderno').list()
+    }
+
+
+	void buildTitle(params) {
+		def titles = []
+		titles << 'List of' 
+		
+		if (params.taxability) {
+			titles << params.taxability[0] + params.taxability.substring(1).toLowerCase()
+		}
+		if (params.classification) {
+			titles << params.classification.name[0] + params.classification.name.substring(1).toLowerCase()
+		}
+		titles << 'Real Properties'
+
+		if (params.state && 'CANCELLED'.equalsIgnoreCase(params.state))  {
+			titles << '( Cancelled )'
+		}
+		params.title = titles.join(' ')
+	}
+
+	void buildFilters(params) {
+        if (!params.year) throw new Exception('year is required');
+		
+        params.currentyear = dtSvc.serverYear
+        util.buildStartEndDateFilter(params)
+
+		def filters = []
+        filters << ' dtapproved >= $P{startdate} AND dtapproved < $P{enddate}'
+
+		if (params.lgu) {
+			params.lguid = params.lgu.objid 
+			filters << ' lguid = $P{lguid} '
+		}
+		if (params.barangay) {
+			params.barangayid = params.barangay.objid
+			filters << ' barangayid = $P{barangayid} '
+		}
+		if (params.classification) {
+			params.classid = params.classification.objid
+			filters << ' classification_objid = $P{classid} '
+		}
+		if (params.rputype) {
+			filters << ' rputype = $P{rputype} '
+		}
+		if (params.taxability) {
+			params.taxable = 1
+			if ('EXEMPT'.equalsIgnoreCase(params.taxability)) params.taxable = 0
+			filters << ' taxable = $P{taxable} '
+		}
+		
+        params.filters = ''
+        if (filters) {
+			params.filters = ' AND ' + filters.join(' AND ')
+        }
+
+		params.orderbyclause = ''
+		if( params.orderby ) { 
+			params.orderbyclause = 'ORDER BY ' + params.orderby.fieldname
+		}
+	}
+
+
+}

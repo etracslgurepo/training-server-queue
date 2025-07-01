@@ -1,0 +1,24 @@
+import com.rameses.annotations.*;
+
+
+class SysReportGeneratorService  {
+
+	@Service("SysReportGeneratorService")
+	def svc; 
+
+
+	@ProxyMethod
+	public def generate(params) {
+		log('PARAMS', params)
+		return svc.generate(params)
+	}
+
+
+	void log(type, data) {
+		println 'SysReportGeneratorService [' + type +'] ' + data
+	}
+
+}
+
+
+

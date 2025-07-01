@@ -1,0 +1,103 @@
+import com.rameses.annotations.*
+import com.rameses.common.*
+import com.rameses.services.extended.*
+
+
+/*----------------------------------------------------------------
+* Resection Synchronization support shared 
+* between province and municipalities 
+-----------------------------------------------------------------*/
+class ResectionSyncDataInterceptor
+{
+    @Env
+    def env
+
+    @DataContext('resection')
+    def em_resection;
+
+    @Service('RPTMainSyncDataService')
+    def mainSyncSvc    
+
+    @Service('RPTSyncDataService')
+    def syncSvc
+
+    @Service('ResectionSyncDataService')
+    def resectionSync 
+
+
+    /*---------------------------------------------------------
+    *
+    * SCHEDULING SUPPORT
+    *
+    ---------------------------------------------------------*/
+    @After(pattern="ResectionWorkflowService.signal", eval="#{args[0].state.matches('forprovsubmission') && args[0].action=='completed'}", index=10000) 
+    public void scheduleSubmitToProvince( evt ) {
+        def resection = evt.args[0].data;
+        mainSyncSvc.createDataForSync(getDataForSync(resection, 'RESECTION-FORAPPROVAL'))
+    }
+
+    @After(pattern="MunicipalityResectionSupportService.resendToProvince", index=10000) 
+    public void scheduleResendToProvince( evt ) {
+        def resection = evt.result;
+        mainSyncSvc.createDataForSync(getDataForSync(resection, 'RESECTION-FORAPPROVAL'))
+    }
+
+    @After(pattern="MunicipalityResectionSupportService.resendRequirements", index=10000) 
+    public void scheduleResendRequirements( evt ) {
+        def resection = evt.result;
+        mainSyncSvc.createDataForSync(getDataForSync(resection, 'RESECTION-REQUIREMENTS'))
+    }
+
+    @After(pattern="ResectionWorkflowService.signal", eval="#{args[0].state.matches('approver|provapprover|muniapprover') && args[0].action=='completed'}", index=10000) 
+    public void scheduleResectionApproval( evt ) {
+        def resection = evt.args[0].data;
+        mainSyncSvc.createDataForSync(getDataForSync(resection, 'RESECTION-APPROVED'))
+    }
+
+    @After(pattern="ResectionService.resendToMunicipality", index=10000) 
+    public void resendToMunicipality( evt ) {
+        def resection = evt.result;
+        mainSyncSvc.createDataForSync(getDataForSync(resection, 'RESECTION-APPROVED'))
+    }
+
+    
+    /* scheduler */
+    @After(pattern="RPTMainSyncDataService.scheduleSync", eval="#{result.action.matches('RESECTION-.*')}", index=50000) 
+    public void scheduleForSync( evt ) {
+        def data = evt.result 
+        resectionSync.schedule(data)
+    }   
+
+
+    /*---------------------------------------------------------
+    *
+    * SEND/RECEIVE HANDLERS
+    *
+    ---------------------------------------------------------*/
+    @After(pattern="RPTMainSyncDataService.asyncSend", eval="#{result.action.matches('RESECTION-.*')}") 
+    public void send( evt ) {
+        def syncdata = evt.result 
+        resectionSync.send(syncdata)
+    }   
+
+    @After(pattern="RPTMainSyncDataService.receive", eval="#{args[0].action.matches('RESECTION-.*')}") 
+    public void receiveData(evt){
+        def syncdata = evt.args[0]
+        resectionSync.receive(syncdata)
+    }
+
+
+
+    def getDataForSync(resection, action) {
+        def data = [:]
+        data.objid = resection.objid
+        data.reftype = 'resection'
+        data.refno = resection.txnno
+        data.orgid = env.ORGID
+        data.remote = syncSvc.getRemoteOrg(resection)
+        data.action = action
+        data.info = [:]
+        return data
+    }
+}
+

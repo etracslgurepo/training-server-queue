@@ -1,0 +1,14 @@
+<schema>
+	<element tablename="paymentpartner">
+		<field name="objid" primary="true" visible="true" caption="ID"/>
+		<field name="code" required="true"  caption="Code"/>
+		<field name="name" required="true"  caption="Name"/>
+		<field name="indexno" caption="IndexNo"/>
+
+		<field name="branch" caption="Branch"/>
+		<field name="contact" caption="Contact"/>
+		<field name="mobileno" caption="MobileNo"/>
+		<field name="phoneno" caption="PhoneNo"/>
+		<field name="email" caption="Email"/>
+	</element>
+</schema>	

@@ -1,0 +1,18 @@
+import com.rameses.annotations.*;
+
+class QrCodeOrgInterceptor {
+	
+	@Service( dynamic=true )
+	def dynaSvc; 
+
+	@Before( pattern="QrCodeInfoService.getData", index=-9999 )
+	public void beforeGetData( evt ) {
+		def param = evt.args[0]; 
+		if ( param instanceof Map ) {
+			if ( !param.orgcode ) {
+				def orgSvc = dynaSvc.lookup('OrgService', 'admin'); 
+				param.orgcode = orgSvc.getRoot()?.objid; 
+			}
+		}
+	}
+}

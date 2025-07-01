@@ -1,0 +1,47 @@
+import com.rameses.annotations.*;
+
+class EORRemittanceReportRcdService {
+	
+	@DataContext('eor_remittance')
+	def rem_db; 
+
+	@ActiveDB('eor_remittance_rcd')
+	def rcd_db; 
+
+	@Service( dynamic=true )
+	def dynaSvc; 
+
+	@Service("NumberService")
+	def numSvc;
+
+	@ProxyMethod 
+	public def getReport( param ) { 
+		if ( !param.remittanceid ) throw new Exception('remittanceid parameter is required'); 
+
+		def data = rem_db.find([ objid: param.remittanceid ]).first();  
+		if ( !data ) throw new Exception("No record(s) found ");
+
+		if ( data.createdby?.objid ) {
+			def userSvc = dynaSvc.lookup('PersistenceService', 'admin'); 
+			def user = userSvc.read([ _schemaname: 'sys_user', findBy: [objid: data.createdby.objid]]); 
+			if ( user ) {
+				data.createdby.name = user.fullname; 
+				data.createdby.title = user.jobtitle; 
+			} 
+		}
+
+		data.amountinwords = numSvc.doubleToWords( data.amount ); 
+		data.collectiontypes = rcd_db.getCollectionTypes( param ); 
+		data.collectionsummaries = rcd_db.getCollectionSummaries( param ); 
+		data.remittedforms = [[:]]; 
+		data.nonserialremittances = [[:]]; 
+
+		def balances = rcd_db.getPrevBalances( param ); 
+		if ( balances ) {
+			data.prevbalance = balances.sum{( it.balance ?: 0 )} 
+		} 
+		data.prevbalance = ( data.prevbalance ?: 0 ); 
+		data.postbalance = ( data.prevbalance - data.amount ); 
+		return data; 
+	}
+}

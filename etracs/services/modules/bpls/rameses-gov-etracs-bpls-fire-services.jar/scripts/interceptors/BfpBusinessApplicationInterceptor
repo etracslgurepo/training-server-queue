@@ -1,0 +1,39 @@
+import com.rameses.annotations.*;
+
+class BfpBusinessApplicationInterceptor {
+
+	@DataContext( dynamic=true )
+	def dynaEm;
+
+	@Service( dynamic=true )
+	def dynaSvc;
+
+	@Service("Var")
+	def sysvar;
+
+	@After(pattern="BusinessApplicationService.saveAssessment")
+	public void afterSaveAssessment( evt ) { 
+		def param = evt.args[0]; 
+		if ( param?.objid ) {
+			def sysvar = dynaSvc.lookup('Var'); 
+			def varvalue = sysvar.getProperty('bpls_fee_bfp_split_receipt', null);  
+			if ( varvalue.toString().matches('true|1')) {
+
+				// this means that the BFP fee 
+				// will be paid in a separate receipt 
+				// and not in the Treasurer's Office
+				// 
+				def em = dynaEm.lookup('bpls_fee_bfp');
+				def list = em.getList([ applicationid: param.objid, tag: 'BFP']); 
+				list.each{ fee-> 
+					em.updateFee([ objid: fee.objid, state: 1 ]); 
+				}
+			}
+			else {
+				// this means that the BFP fee 
+				// is included in a one-time payment 
+			}
+		}
+	} 
+
+} 

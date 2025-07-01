@@ -1,0 +1,239 @@
+import com.rameses.annotations.*;
+
+class OnlineBplsUAFService {
+
+	@XConnection( dynamic=true )
+	def dynaConn;
+
+	@DataContext( dynamic=true )
+	def dynaEm;
+
+	@Service( dynamic=true )
+	def dynaSvc; 
+	
+	@ProxyMethod 
+	public def generateNew( app ) {
+		buildDataForNew( app ); 
+		capitalize( app ); 
+		resolveApp( app ); 
+
+		def param = [ 
+			data: app, 
+			template: 'bpls/uaf/main-new',
+			reportid: 'bpls_uaf_registration', 
+			parameters: [ PRINTEDBY: app.contact?.name ]
+		]; 
+
+		def reportSvc = dynaSvc.lookup('JasperReportService'); 
+		def result = reportSvc.generateReport( param ); 
+		return result; 
+	}
+
+
+
+	void buildDataForNew( app ) {
+		def orgSvc = dynaSvc.lookup('SysOrgService'); 
+		def org = orgSvc.findRootOrg();
+
+		app.address.type = 'local';
+		attachOrg( app.address, org ); 
+
+		if ( !app.applicant.address.type ) {
+			app.applicant.address.type = 'local'; 
+		}
+		attachOrg( app.applicant.address, org ); 
+
+		if ( !app.appno ) app.appno = app.trackingno;
+		if ( !app.barcode ) app.barcode = app.trackingno;
+
+		app.dtfiled = app.remove('appdate');
+
+		def business = [:];
+		business.address = app.remove('address');
+		business.businessname = app.remove('businessname'); 
+		business.tradename = app.remove('tradename'); 
+		business.orgtypename = ORG_TYPES.get( app.orgtype.id ); 
+		business.email = app.contact.remove('email');
+		business.phoneno = app.contact.remove('mobileno');
+		business.owner = app.remove('applicant'); 
+		if ( app.orgtype.id == 'SING') {
+			business.owner.email = business.owner.contact.remove('email');
+			business.owner.mobileno = business.owner.contact.remove('mobileno');
+			business.owner.phoneno = business.owner.contact.remove('phoneno');
+		}
+
+		def owner_gender = business.owner?.gender; 
+		if ( owner_gender.toString().toUpperCase().matches('M|MALE')) {
+			business.owner.gender = 'M'; 
+		}
+		else if ( owner_gender.toString().toUpperCase().matches('F|FEMALE')) {
+			business.owner.gender = 'F'; 
+		}
+
+		if ( !business.owner.sss ) {
+			def idinfo = business.owner.id;
+			if ( idinfo instanceof Map ) {
+				def idtype = idinfo.type?.name.toString().toUpperCase(); 
+				if ( idtype == 'SSS' ) business.owner.sss = idinfo.idno;				
+			}
+		}
+
+		def officetype = app.remove('officetype'); 
+		if ( officetype ) {
+			business.officetype = officetype.toString().toUpperCase(); 
+		} else {
+			business.officetype = 'MAIN'; 
+		}
+
+		app.business = business; 
+
+		def infos = app.remove('infos');
+		infos.each{ 
+			app.put( it.name.toLowerCase(), it.value ); 
+		}
+
+		def oldlobs = [ app.remove('primarylob') ];
+		if ( app.lobs ) oldlobs.addAll( app.remove('lobs')); 
+
+		def varEm = dynaEm.lookup('businessvariable'); 
+
+		def newlobs = []; 
+		oldlobs.each{ o-> 
+			def mm = [:]; 
+			mm.putAll( o.lob ); 
+
+			mm.psic = [code: o.code, name: o.name];
+			mm.psic.classification = o.classification; 
+
+			infos.findAll{( 
+				it.lob?.objid == mm.objid && 
+				it.name.toString().toLowerCase().startsWith('declared_')
+			)}.each{ 
+				def value = it.value; 
+
+				def var = varEm.find([ objid: it.name ]).first(); 
+				if ( var.datatype == 'decimal' ) { 
+					value = ((Number) value).doubleValue(); 
+				}
+				else if ( var.datatype == 'integer' ) { 
+					value = ((Number) value).intValue(); 
+				}
+
+				mm.put( it.name.toString().toLowerCase(), value ); 
+			}
+
+			newlobs << mm; 
+		}
+		app.lobs = newlobs; 
+
+		def doctypes = dynaEm.lookup('businessrequirementtype').where('1=1').list(); 
+
+		def newdocs = [];
+		def olddocs = app.remove('requirements'); 
+		olddocs.each{ o-> 
+			def doctype = doctypes.find{( it.code == o.ref.reftype )}
+			if ( doctype ) newdocs << doctype;
+		}
+		app.requirements = newdocs;
+
+		def size = 5 - app.requirements.size();
+		if ( size > 0 ) {
+			[1..size].each{
+				app.requirements << [filler: 1]; 
+			}
+		}
+
+		app.taxfees = []; 
+		for (int i=0; i<5; i++) {
+			app.taxfees << [filler: 1]; 
+		}
+
+		def ctc = olddocs.find{( it.ref.reftype.toString().toUpperCase() == 'CTC' )} 
+		app.ctcno = ctc?.refno; 
+		app.ctcplaceissued = ctc?.placeissued; 
+		app.ctcdateissued = ctc?.dateissued;
+
+		app.approvername = app.approvertitle = '';
+		app.assessorname = app.assessortitle = '';
+	}
+
+	void attachOrg( Map addr, Map org ) {
+		if ( addr.type != 'local' ) return; 
+
+		def orgclass = org?.orgclass.toString().toUpperCase();  
+		if ( orgclass == 'PROVINCE' ) {
+			addr.municipality = null;  
+			addr.province = org.name; 
+		}		
+		else if ( orgclass == 'MUNICIPALITY' ) {
+			addr.municipality = org.name; 
+			addr.province = org.parent?.name; 
+		}
+		else if ( orgclass == 'CITY' ) {
+			addr.municipality = null;  
+			addr.province = org.parent?.name; 
+
+			def orgname = org.name.toString().toUpperCase().trim(); 
+			if ( orgname.endsWith('CITY')) {
+				addr.city = orgname; 
+			} else {
+				addr.city = orgname +' CITY'; 
+			}
+		}
+	}
+
+	void capitalize( Map data ) {
+		if ( !data ) return;
+
+		data.keySet().each{ k-> 
+			if ( k == 'email' ) return; 
+
+			def v = data.get( k ); 
+			if ( v instanceof String ) {
+				data.put( k, v.toUpperCase() ); 
+			}
+			else if ( v instanceof Map ) {
+				capitalize( v ); 
+			}
+			else if ( v instanceof Collection ) {
+				v.eachWithIndex{ o,idx->  
+					if ( o instanceof Map ) {
+						capitalize( o ); 
+					}
+					else if ( o instanceof String ) {
+						v[idx] = o.toUpperCase();
+					}
+				}
+			}
+		}
+	}
+
+
+	Map ORG_TYPES = [
+		SING: 'SINGLE PROPRIETORSHIP',
+		CORP: 'CORPORATION',
+		COOP: 'COOPERATIVE',
+		ASSO: 'ASSOCIATION',
+		REL: 'RELIGIOUS',
+		FOUND: 'FOUNDATION',
+		PART: 'PARTNERSHIP',
+		GOV: 'GOVERNMENT',
+		SCH: 'SCHOOL',
+		NGO: 'NON-GOVERNMENT ORGANIZATION'
+	]; 
+
+
+	void resolveApp( app ) {
+		if ( app.business instanceof Map ) {
+			app.business.orgtype = app.orgtypeid; 
+			
+			def addr = app.business.address;
+			if ( addr == null ) { 
+				app.business.address = addr = [:]; 
+			}
+
+			def addrtype = addr.type; 
+			addr.type = (addrtype ? addrtype.toLowerCase() : 'local'); 
+		} 
+	}
+}

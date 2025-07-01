@@ -1,0 +1,5 @@
+provider=script
+app.host=${app_server_ip}:${@@osiris3:port}
+app.cluster=osiris3
+app.context=epayment
+readTimeout=60000

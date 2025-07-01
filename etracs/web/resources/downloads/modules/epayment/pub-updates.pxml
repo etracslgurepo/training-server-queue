@@ -1,0 +1,12 @@
+<app>
+<env>
+epayment.build=2.5.01.02.06
+epayment.app.host=${pub_app_server_ip}:18070
+epayment.app.context=epayment
+</env>
+<modules>
+  <module version="2.06" file="epayment/rameses-gov-epayment.jar"  />
+  <module version="2.05" file="epayment/rameses-gov-epayment-report.jar"  />
+  <module version="2.04" file="epayment/reports/epayment-report-templates.jar"  />
+</modules>
+</app>

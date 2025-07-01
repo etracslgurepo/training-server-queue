@@ -1,0 +1,169 @@
+import com.rameses.annotations.*;
+import com.rameses.util.*;
+import java.rmi.server.*;
+
+public class BusinessPostPaymentService  {
+
+	@Service("BusinessPaymentService")
+	def pmtSvc;
+
+	@Service("BusinessBillingService")
+	def billingSvc;
+
+	@Service("BusinessApplicationService")
+	def appSvc;
+
+	@Service("BusinessApplicationWorkflowService")
+	def workflowSvc;
+
+	@ProxyMethod
+	public void postPayment( def a ) {
+		if (a.taxfees.findAll{ !it.receivableid }) 
+			throw new Exception("each item must have receivableid"); 
+
+		//recheck the application status
+		def appstate = appSvc.getStatus([objid: a.applicationid]); 
+		if (!appstate.toString().toLowerCase().matches('payment|release|completed')) 
+			throw new Exception("The current application status is not allowed for this transaction. Please verify."); 
+
+		if ( !a.reftype ) throw new Exception('Please specify the reftype (receipt type)'); 
+
+		def m = [:];
+		m.objid = a.objid;
+		m.businessid = a.businessid;
+		m.applicationid=a.applicationid;
+		m.appyear = a.appyear;
+		m.refid = a.objid;
+		m.refno = a.receiptno;
+		m.refdate = a.receiptdate;
+		m.reftype = a.reftype;
+		m.amount = a.amount;
+		m.remarks = a.remarks;
+		m.taxcredit = ( a.totalcredit ? a.totalcredit : 0.0 );
+		m.paymentmode = a.paymentmode;		
+		m.voided = 0;
+
+		if ( a.group ) {
+			m.objid = a.group.objid;
+			m.refid = m.objid;
+			m.refno = 'RCT-GROUP'; 
+			m.reftype = 'cashreceipt_group'; 
+			m.amount = a.group.amount;
+		}
+
+		m.items = [];
+		a.taxfees.each {tf-> 
+			if ( tf.details ) {
+				tf.details.each{d-> 
+					if ( d.partial == null) d.partial=0; 
+
+					m.items << d; 
+				}
+			} else {
+				if ( tf.partial == null) tf.partial=0; 
+				if ( tf.qtr == null ) tf.qtr=0;
+				m.items << tf; 
+			} 
+		}
+		
+		pmtSvc.create( m );
+
+		def app = appSvc.open([ objid: m.applicationid ]);
+		if ( app.state == 'COMPLETED' ) return; 
+
+		def stat = appSvc.checkReleaseStatus([ 
+			objid: m.applicationid, apptype: app.apptype, 
+			txnmode: app.txnmode, appyear: app.appyear, 
+			receiptdate: a.receiptdate 
+		]); 
+
+		if ( stat.canRelease == true ) { 
+			def tsk = workflowSvc.getTaskFromAppid([ applicationid: m.applicationid ]); 
+			if ( tsk?.state == 'payment' ) { 
+				tsk.action = 'release'; 
+				tsk.data = [objid: m.applicationid, appno: app.appno, business: app.business]; 
+				workflowSvc.signal( tsk ); 
+			} 
+		} 
+	}
+
+
+	@ProxyMethod
+	public void postVoidPayment( def r ) { 
+		def pmt = null; 
+		def group_receiptid = r.group?.objid; 
+		if ( group_receiptid ) {
+			pmt = pmtSvc.findPayment([ objid: group_receiptid ]); 
+		} 
+		else {
+			pmt = pmtSvc.open([ objid: r.objid ]);
+		}
+
+		if ( !pmt?.objid ) {
+			// do nothing if payment not found 
+			return; 
+		}
+			
+		if ( pmt.voided != 0 ) 
+			throw new Exception("Business payment has already been voided");
+
+		def app = appSvc.open([ objid: pmt.applicationid ]);
+		if ( !app ) throw new Exception("Business application record not found");
+
+		// check if the receipt is the last payment made for this app 
+		// 
+		def payments = pmtSvc.getApplicationPayments([ applicationid: pmt.applicationid ]); 
+		if ( !payments ) throw new Exception("Business payment has already been voided");
+
+		// payments are listed from latest down to oldest 
+		// 
+		def lastpmt = payments.first(); 
+		def lastreceipts = payments.findAll{( it.refdate == lastpmt.refdate && it.reftype.startsWith('cashreceipt'))} 
+		if ( !lastreceipts ) throw new Exception("No business payment receipts found"); 
+
+		lastreceipts = lastreceipts.sort{ it.refno }.reverse(); 
+
+		boolean pass = false; 
+		if ( group_receiptid ) {
+			if ( lastreceipts.find{( it.group?.objid == group_receiptid )}) {
+				pass = true; 
+			} 	
+		}
+		else if ( lastreceipts.find{( it.objid == pmt.objid )} ) { 
+			pass = true; 
+		} 
+
+		if ( !pass ) { 
+			throw new Exception("You must first void the last payment receipt made for this application");	
+		}
+
+		def appstate = app.state.toString().toUpperCase();
+		if ( appstate == 'COMPLETED' ) {
+			if ( app.permit?.objid ) { 
+				def YMD = new java.text.SimpleDateFormat('yyyyMMdd');
+				def permitIssueDate = YMD.format( app.permit.dtissued ).toInteger(); 
+				def paymentRefDate  = YMD.format( pmt.refdate ).toInteger(); 
+				if ( paymentRefDate <= permitIssueDate ) {
+					throw new Exception("You must first cancel the active permit for this application");	
+				}
+			}
+		}
+
+		pmtSvc.voidPayment([ objid: pmt.objid, voidrct: r ]);
+
+		if ( appstate != 'COMPLETED') {
+			def tsk = workflowSvc.getTaskFromAppid([applicationid: pmt.applicationid]);
+			if ( tsk?.state == 'release' ) {
+				pmt.verified = true; 
+
+				tsk.action = 'revert';
+				tsk.data = [
+					objid: pmt.applicationid, appno: app.appno, 
+					business: app.business, payment: pmt
+				];
+				workflowSvc.signal( tsk ); 
+			}
+		}
+	}
+}
+

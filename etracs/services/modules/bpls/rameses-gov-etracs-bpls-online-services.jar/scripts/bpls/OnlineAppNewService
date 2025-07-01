@@ -1,0 +1,204 @@
+import com.rameses.annotations.*;
+import com.rameses.util.KeyGen; 
+import java.rmi.server.UID;
+
+class OnlineAppNewService {
+
+	@Env 
+	def env; 
+
+	@DataContext( dynamic=true )
+	def dynaEm; 
+
+	@Service( dynamic=true ) 
+	def dynaSvc;
+
+
+	@ProxyMethod 
+	public def buildOwner( app ) {
+		def owner = app.datainfo.applicant; 
+		owner.name = app.owner.name; 
+		owner.entityname = owner.name; 
+		owner.address.text = app.owner.address.text; 
+
+		def md5 = com.rameses.util.Encoder.MD5; 
+		def key = 'ONTP' + md5.encode( app.controlno ); 
+		owner.objid = key; 
+		owner.address.objid = key; 
+		owner.address.parentid = key; 
+		owner.state = 'INACTIVE';  
+		owner.orgtype = (app.orgtype ? app.orgtype : app.orgtypeid);
+
+		if ( app.orgtype == 'SING' ) {
+			owner.type = 'INDIVIDUAL'; 
+			owner.remove('administrator'); 
+			owner.gender = (owner.gender ? owner.gender : ''); 
+		} 
+		else {
+			owner.type = 'JURIDICAL';
+			
+			if ( owner.administrator instanceof Map ) {
+				def arrs_1 = [
+					owner.administrator.lastname, 
+					owner.administrator.firstname   
+				];
+				def arrs_2 = [
+					arrs_1.findAll{( it )}.join(','), 
+					owner.administrator.middlename 
+				];
+				owner.administrator.name = arrs_2.findAll{( it )}.join(' '); 
+			}
+		}
+
+		def contact = owner.remove('contact'); 
+		if ( contact instanceof Map ) {
+			owner.email = contact.email; 
+			owner.phoneno = contact.phoneno; 
+			owner.mobileno = contact.mobileno; 
+		}
+
+		def idinfo = owner.remove('id'); 
+		if ( idinfo instanceof Map ) {
+			idinfo.objid = owner.objid; 
+			idinfo.entityid = owner.objid; 
+			if ( idinfo.type instanceof Map ) {
+				idinfo.idtype = idinfo.type.name.toString().toUpperCase();
+			}
+			else if ( idinfo.type instanceof String ) {
+				idinfo.idtype = idinfo.type; 
+			}
+
+			idinfo.dtexpiry = idinfo.remove('dtvalid');
+			idinfo.remove('type');  
+		}
+		owner.id = idinfo; 
+		return owner; 
+	}
+
+
+	@ProxyMethod 
+	public def approve( app ) {
+		if ( !app.state.toString().matches('OPEN')) 
+			throw new Exception('Application record must be in OPEN status'); 
+
+ 		def taxpayerid = app.datainfo?.taxpayerid; 
+ 		if ( !taxpayerid ) 
+ 			throw new Exception('Business owner must have a mapping to the Taxpayer Profile'); 
+
+ 		def appSvc = dynaSvc.lookup('BusinessApplicationService');
+ 		def param = [txnmode: 'ONLINE', apptype: app.apptype, appyear: app.appyear]; 
+ 		def newapp = appSvc.initNew( param );
+
+ 		buildApp( newapp, app ); 
+
+ 		def business = newapp.business; 
+
+		def filter = [ objid: taxpayerid ]; 
+		if ( business.orgtype == 'SING' ) { 
+			filter._schemaname = 'entityindividual';  
+		}
+		else {
+			filter._schemaname = 'entityjuridical';  
+		}
+
+		def persistenceSvc = dynaSvc.lookup('PersistenceService'); 
+		business.owner = persistenceSvc.read( filter );  
+
+ 		newapp = appSvc.create( newapp ); 
+
+ 		def uu = [state: 'PROCESSING']; 
+ 		uu.business = [objid: newapp.business.objid];
+		uu.approvedby = [ objid: env.USERID, name: env.FULLNAME ]; 
+		uu.approvedappno = newapp.appno;  
+		uu.dtapproved = newapp.txndate; 
+
+ 		def em = dynaEm.lookup('online_business_application'); 
+ 		em.find([ objid: newapp.objid ]).update( uu ); 
+
+ 		return uu; 
+	}
+
+
+	void buildApp( newapp, oldapp ) {
+		newapp.objid = oldapp.objid; 
+		newapp.appyear = oldapp.appyear; 
+ 		newapp.dtfiled = oldapp.appdate; 
+ 		newapp.txndate = oldapp.dtsubmitted; 
+ 		newapp.dtcreated = oldapp.dtcreated; 
+ 		newapp.createdby = oldapp.createdby;
+ 		newapp.yearstarted = newapp.appyear; 
+ 		
+ 		newapp.business = buildBusiness( oldapp );
+
+ 		newapp.lobs = oldapp.lobs; 
+ 		newapp.lobs.each{ 
+ 			it.lobid = it.lob.objid; 
+ 			it.name = it.lob.name; 
+ 		}
+
+ 		newapp.appinfos = [];
+ 		oldapp.infos.groupBy{ it.objid }.each{ k,v-> 
+ 			def bi = v.first();
+ 			bi.level = 0; 
+ 			newapp.appinfos << bi; 
+ 		}
+
+ 		newapp.requirements = oldapp.requirements; 
+ 		newapp.requirements.each{
+ 			it.reftype = it.ref.reftype; 
+ 			it.title = it.ref.title; 
+ 			it.step = it.ref.step;
+
+ 			if ( !it.refno ) 
+ 				it.refno = it.attachment?.refno;
+ 			if ( !it.dtissued ) 
+ 				it.dtissued = it.attachment?.dtissued;
+
+ 			it.completed = (it.refno ? true : false);  
+ 		}
+	}
+
+	def buildBusiness( app ) {
+		def md5 = com.rameses.util.Encoder.MD5; 
+		def key = md5.encode( app.controlno );
+
+		def data = [:]; 
+		data.objid = 'ONBUS-'+ key;
+		data.state = 'PROCESSING'; 
+		data.tradename = app.tradename; 
+		data.businessname = app.businessname;
+		data.orgtype = app.datainfo.orgtypeid;
+		data.yearstarted = app.appyear;
+		data.activeyear = app.appyear;
+		data.taxcredit = 0.0;
+		data.activeqtr = 0;
+		data.appcount = 1;
+		data.apptype = app.apptype;
+		data.permittype = app.datainfo.permittype;
+		data.officetype = app.datainfo.officetype; 
+		if ( !data.officetype ) data.officetype = 'MAIN'; 
+
+		data.email = app.contact?.email;
+		data.mobileno = app.contact?.mobileno;
+		data.phoneno = app.contact?.phoneno;
+
+		data.address = app.address; 
+		if ( app.datainfo.address instanceof Map) {
+			data.address.putAll( app.datainfo.address ); 
+		} 
+
+		data.address.businessid = data.objid; 
+
+		if ( data.address.lessor instanceof Map ) {
+			def lessor = data.address.lessor; 
+			if ( !(lessor.address instanceof Map)) { 
+				lessor.address = [ 
+					text: (lessor.address ? lessor.address.toString(): null) 
+				];
+			}
+		}
+		return data; 
+	}
+
+
+}

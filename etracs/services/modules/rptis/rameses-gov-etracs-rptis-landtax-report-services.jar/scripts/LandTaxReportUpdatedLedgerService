@@ -1,0 +1,75 @@
+import com.rameses.annotations.*
+import com.rameses.common.*;
+import com.rameses.services.extended.*;
+
+class LandTaxReportUpdatedLedgerService
+{
+	@Env 
+	def env 
+
+    @ActiveDB('landtaxreport_updated_ledger')
+    def em
+
+    @Service('RPTUtil')
+    def util
+
+    @Service('DateService')
+    def dtSvc
+
+    
+
+    @Async
+    @ProxyMethod
+    public def getReportData( params ) {
+		buildFilters(params)
+
+		def list = em.getList(params)
+		if( ! list ) throw new Exception('Record not found.')
+
+		def forlguname = env.ORGCLASS + ' OF ' + env.ORGNAME 
+		if (params.lgu) {
+			forlguname = params.lgu.lgutype.toUpperCase() + ' OF ' + params.lgu.name 
+		}
+
+		def p = [
+            FORLGUNAME : forlguname,
+            BARANGAY: params.barangay?.name,
+            YEAR: params.year,
+        ]
+
+		return [
+			parameters  : p,
+			reportdata 	: list
+		]
+    }
+
+	void buildFilters(params) {
+        if (!params.year) throw new Exception('year is required');
+		
+        def filters = []
+        params.year = dtSvc.serverYear
+
+        filters << 'lastyearpaid >= $P{year}'
+        
+		if (params.lgu) {
+			params.lguid = params.lgu.objid 
+			filters << ' lguid = $P{lguid} '
+		}
+		if (params.barangay) {
+			params.barangayid = params.barangay.objid
+			filters << ' barangayid = $P{barangayid} '
+		}
+		
+        params.filters = ''
+        if (filters) {
+			params.filters = ' AND ' + filters.join(' AND ')
+        }
+
+		params.orderbyclause = ''
+		if( params.orderby ) { 
+			params.orderbyclause = 'ORDER BY ' + params.orderby.fieldname
+		}
+	}
+
+
+}
