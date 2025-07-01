@@ -1,0 +1,15 @@
+<h1>${PAGE.title}</h1>
+<style>
+html {
+	background: #ffffff;
+}
+</style>
+<script>
+try {  
+	var audio = document.createElement('audio');
+	audio.setAttribute('src', '/res/queue/audio/ding.mp3');
+	audio.Element.volume="0.1";
+	audio.play(); 
+} catch(e) {;} 
+</script>
+

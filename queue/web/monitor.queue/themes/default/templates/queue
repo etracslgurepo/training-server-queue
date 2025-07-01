@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title> ${PAGE.title} </title>	
+	<meta name="keywords" content="${PROJECT.keywords} ${MODULE.keywords? MODULE.keywords:''}"/>
+	<meta name="description" content="${PROJECT.description}"/>
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	
+	@stdlib()
+
+	@css("queue")
+	@css("responsive")
+	@css(value: "queue-monitor", ver: "auto")
+	@css(value: "queue-custom", ver: "auto")
+
+	@page-imports()
+</head>
+
+<body>
+${_content} 
+
+</body>
+
+<script src="/res/queue/js/queueing-system.js"></script>
+<script src="/res/queue/js/CODE128.js"></script>
+<script src="/res/queue/js/JsBarcode.js"></script>
+
+</html>

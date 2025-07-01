@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title> ${PAGE.title} </title>	
+	<meta name="keywords" content="${PROJECT.keywords} ${MODULE.keywords? MODULE.keywords:''}"/>
+	<meta name="description" content="${PROJECT.description}"/>
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+
+	@stdlib()
+	@css("basic")
+	@page-imports()
+</head>
+<body>
+<div class="container">
+	<div class="page-content">
+		<div class="page-header">
+		    <img src="/res/images/lgu-logo.png"/>
+		</div>
+		<div class="login-content">
+			${_content}
+		</div>
+	</div> 
+</div>
+</body>
+</html>

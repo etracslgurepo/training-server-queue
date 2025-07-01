@@ -1,0 +1,199 @@
+<%
+String strparams = "{}"; 
+if ( !PARAMS.period ) PARAMS.period='monthly'; 
+if ( !PARAMS.dataviewtype ) PARAMS.dataviewtype='byhour';
+
+def lparams = []; 
+PARAMS.each{ k,v-> 
+	if ( !v ) return; 
+	if ( v instanceof Number ) { 
+		lparams << (''+ k +':'+ v); 
+	} else { 
+		lparams << (''+ k +':"'+ v +'"'); 
+	} 
+} 
+strparams = "{"+ lparams.join(', ') +"}";
+
+def result = [:]; 
+def error = null; 
+def errmsg = null; 
+try { 
+	def svc = SERVICE.lookup('QueueReportService', 'main'); 
+	result = svc.getReport( PARAMS ); 
+	if ( !result ) result = [:]; 
+	if ( !result.resultdata ) { 
+		errmsg = 'No available record(s) that matches your criteria.'; 
+	} 
+} catch(Throwable t) { 
+	Throwable p = t; 
+	while ( true ) {
+		if ( !p.cause ) break; 
+		else p = p.cause; 
+	}
+
+	error = p; 
+	errmsg = p.message; 
+	t.printStackTrace(); 
+} 
+%>
+
+<style>
+.table>tbody>tr>td{border-bottom: none; border-top: none;}
+.table>tbody>tr>th{ vertical-align: bottom;}
+.rowdata{border-bottom: #eee solid 1px; text-align: center }
+.colheader {text-align: center;background: #eee}
+</style>
+
+<script>
+\$put('report', new function() { 
+
+	var self = this; 
+
+	this.criteria = ${strparams} 
+
+	this.back = function() {
+		var elem = \$('#formback');
+		elem.submit(); 
+	} 
+	this.print = function() {
+		window.print();
+		return "_close"
+	}
+}); 
+</script> 
+
+<form id="formback" action="${PAGE.parentPath}" method="POST" style="visibility:hidden;"> 
+<% PARAMS.each { k,v-> %>
+	<input type="hidden" name="${k}" value="${v}"/> 
+<%}%>
+</form> 
+
+<div style="padding-top:5px;"></div>
+<table cellpadding="0" cellspacing="0" border="0">
+<tr>	
+	<td>		
+		<input type="button" r:context="report" r:name="back" value="Back" class="btn btn-primary"/> 
+		<%if ( !errmsg ) { %> 		
+		<button id="btnExportExcel" class="btn btn-primary">Export</button> 
+		<input type="button" r:context="report" r:name="print" value="Print" class="btn btn-primary"/> 
+		<%}%>
+	</td>
+</tr>
+</table>
+
+<table class="result" style="width:100%;"> 
+<tbody>
+	<tr>	
+		<td><h4 style="margin-bottom:0px;"> ${PAGE.title} </h4></td> 
+	</tr>
+	<tr>
+		<td style="padding-top:0px;">${result.periodtitle}</td>
+	</tr>
+</tbody> 
+</table> 
+
+<%if ( errmsg ) { %> 
+	<br/>
+	<div class="error" style="font-size:12pt;color:red;"> 
+		${errmsg} 
+	</div> 
+<%}%>
+
+<%
+if ( result?.resultdata ) { 
+	def numformatter = new java.text.DecimalFormat('#,##0'); 
+
+	def sections = result.resultdata.collect{[ key: it.sectionid ]}.unique(); 
+	sections.each{ o-> 
+		def m = result.resultdata.find{ it.sectionid==o.key } 
+		o.title = m?.sectiontitle; 
+		if ( !o.title ) o.title = o.key; 
+	}
+
+	def targets = []; 
+	def datas = result.resultdata.groupBy{[ key: it.txnday ]} 
+	datas.each{ k,v-> 
+		k.cols = []; 
+
+		def map = v.groupBy{ it.sectionid } 
+		if ( map == null ) map = [:];
+
+		sections.each{ col-> 
+			def coldata = [:];
+			def vv = map.get( col.key ); 
+			if ( vv == null ) vv = []; 
+
+			coldata.objid = col.key; 
+			coldata.title = col.title; 
+			coldata.closedcount = vv.sum{( it.closedcount ? it.closedcount : 0)} 
+			coldata.skipcount = vv.sum{( it.skipcount ? it.skipcount : 0)} 
+			k.cols << coldata; 
+		} 
+
+		targets << k; 
+	} 
+
+	datas.clear(); 
+
+	def maxdata = targets.max{ it.key } 
+	def maxkey = (maxdata?.key ? maxdata.key : 1); 
+	for ( int ii=1; ii<maxkey; ii++ ) { 
+		def o = targets.find{ it.key==ii } 
+		if ( !o ) { 
+			o = [created: true]; 
+			targets << o;  
+		}
+
+		sections.each{ col-> 
+			if ( o.created ) o.key = ii; 
+			if ( o.cols == null ) o.cols = []; 
+
+			def coldata = o.cols.find{ it.objid==col.key } 
+			if ( !coldata ) {
+				coldata = [:]; 
+				coldata.objid = col.key; 
+				coldata.title = col.title; 
+				coldata.closedcount = 0;
+				coldata.skipcount = 0; 
+				o.cols << coldata; 
+			} 
+		} 
+	} 
+
+	targets.sort{ it.key } 
+%> 
+
+<div id="table_wrapper">
+	<br>
+	<table class="table" style="width:100%;"> 
+	<tbody>
+		<tr>
+			<th class="colheader" rowspan="2"> DAY </th>
+			<%
+			sections?.each{ o->  
+				println '<th colspan="2" class="colheader group-colheader">'+ o.title +'</th>'; 
+				}
+			%>
+		</tr>
+		<tr>
+			<%
+			sections?.each{ o->  
+				println '<th class="colheader"> SERVED </th>'; 
+				println '<th class="colheader"> SKIP </th>'; 
+			}
+			%>
+		</tr>
+		<%targets?.each{ o-> %>
+		<tr class="rowdata">
+			<td>${o.key}</td>
+			<% o.cols.each{ item-> %>
+				<td>${item.closedcount ? item.closedcount : '-'}</td>
+				<td>${item.skipcount ? item.skipcount : '-'}</td>
+			<%}%>
+		</tr>	
+		<%}%>
+	</tbody> 
+	</table> 
+	
+<%}%>
+</div>

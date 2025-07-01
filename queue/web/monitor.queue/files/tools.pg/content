@@ -1,0 +1,31 @@
+<%
+def groupSvc = SERVICE.lookup('QueueGroupService', 'main'); 
+def groups = groupSvc.getGroups(); 
+%>
+
+<h2>${PAGE.title}<h2>
+
+<script>
+\$put('tools', new function(){
+
+	var _svc = Service.lookup('QueueMonitorToolService', 'queue'); 
+	var _self = this; 
+
+	this.groupid = null;
+
+	this.reloadMonitor = function() { 
+		if ( this.groupid ) {
+			_svc.refresh({ groupid: this.groupid });  	
+		}		
+	} 
+
+}); 
+</script>
+
+<select r:context="tools" r:name="groupid"> 
+	<option> -- Select a group -- </option> 
+	<%groups.each{ gg-> %>
+	<option value="${gg.objid}"> ${gg.objid} </option> 
+	<%}%>
+</select> 
+<input type="button" r:context="tools" r:name="reloadMonitor" value="Reload Monitors"/>

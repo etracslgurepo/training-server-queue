@@ -1,0 +1,5 @@
+provider=websocket
+ws.host=localhost:${@@websocket:port}
+ws.protocol=queue
+ws.group=queue
+ws.enabled=true

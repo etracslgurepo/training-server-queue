@@ -1,0 +1,13 @@
+<% 
+def flavor = "default"; 
+def themeName = THEME.name ? THEME.name : "default"; 
+def ver = (OPTIONS.ver ? OPTIONS.ver : 1.0); 
+def href = new StringBuilder(); 
+href.append("/themes/${themeName}/css/${flavor}/${OPTIONS.value}.css?");
+if ( OPTIONS.ver.toString().toLowerCase() == 'auto' ) {
+	href.append("versionid=").append( new java.rmi.server.UID().toString()); 
+} else {
+	href.append("ver=${ver}"); 
+}
+%>
+<link href="${href}" type="text/css" rel="stylesheet"></link>

@@ -1,0 +1,24 @@
+import com.rameses.annotations.*;
+
+class QueueMonitorToolService {
+	
+	@XConnection("queue_poll")
+	def queue_poll;
+
+	@Service 
+	def self; 
+
+	@ProxyMethod 
+	public def refresh( params ) { 
+		self.notifyHttp([ type:'RELOAD_MONITOR', groupid: params.groupid ]); 
+	}
+
+	@Async 
+	@ProxyMethod(local=true) 
+	public void notifyHttp( data ) { 
+		if ( data?.type ) { 
+			println '[QueueMonitorToolService] ' + data; 
+			queue_poll.send( data ); 
+		} 
+	} 
+}

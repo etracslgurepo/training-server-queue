@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title> ${PAGE.title} </title> 
+  <meta name="keywords" content="${PROJECT.keywords} ${MODULE.keywords? MODULE.keywords:''}"/>
+  <meta name="description" content="${PROJECT.description}"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  @stdlib()
+  @css("report")
+  @jslib("highcharts")
+  @page-imports()
+</head>
+
+<body>
+    <div id="wrapper">
+
+        <!-- Navigation -->
+        <nav class="navbar navbar-default navbar-static-top" role="navigation" style="margin-bottom: 0">
+            <div class="navbar-header">
+                <a class="navbar-brand pal-logo" href="/report">
+                    <img src="/res/images/lgu-logo.png">
+                </a>
+                <img src="/res/images/rameses.png" class="rameses-logo">
+                <div class="logout">@logout()</div>
+            </div>
+
+            <div class="navbar-default sidebar" role="navigation">
+                <div class="sidebar-nav navbar-collapse">
+                    <ul class="nav" id="side-menu">
+
+                    <%
+                    def items = ANUBIS.getFolder( '/secured/report' ).allowedChildren; 
+                    items = items.findAll{( it.hidden != true )}.collect{[ 
+                        path: it.path, title: it.title, 
+                        reportType: (it.reportType ? it.reportType : 'listing') 
+                    ]} 
+                    def categories = [
+                        [ 
+                            title: 'Summary Reports', 
+                            items: items.findAll{ it.reportType=='summary' } 
+                        ], 
+                        [ 
+                            title: 'Listing Reports', 
+                            items: items.findAll{ it.reportType=='list' } 
+                        ]
+                    ]; 
+                    %>
+
+                    <% categories.findAll{( it.items? true : false )}.each{ o-> %>
+                        <li>
+                            <p href="#">
+                                <i class="fa fa-bar-chart-o fa-fw"></i> 
+                                ${o.title}
+                            </p>
+                            <ul class="nav nav-second-level">
+                            <% o.items.each{ oitem-> %> 
+                                <li>
+                                    <a href="${oitem.path}">${oitem.title}</a>
+                                </li>
+                            <% } %>
+                            </ul>
+                        </li>                    
+                    <% } %>
+                    </ul>
+                </div>
+                <!-- /.sidebar-collapse -->
+            </div>
+
+            <!-- /.navbar-static-side -->
+        </nav>
+
+        <div id="page-wrapper">
+            <div class="row">
+                <div class="col-lg-12">
+                    ${_content} 
+                </div>
+                <!-- /.col-lg-12 -->
+            </div>
+        </div>
+        <!-- /#page-wrapper -->
+    </div>
+    <!-- /#wrapper -->
+</body>
+
+<script src="/js/excel-export.js"></script>
+<script src="/js/jspdf.js"></script>
+
+</html>

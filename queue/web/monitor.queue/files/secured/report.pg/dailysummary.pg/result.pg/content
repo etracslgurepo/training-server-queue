@@ -1,0 +1,182 @@
+<%
+String strparams = "{}"; 
+if ( !PARAMS.period ) PARAMS.period='daily'; 
+
+def lparams = []; 
+PARAMS.each{ k,v-> 
+	if ( v instanceof Number ) { 
+		lparams << (''+ k +':'+ v); 
+	} else { 
+		lparams << (''+ k +':"'+ v +'"'); 
+	} 
+} 
+strparams = "{"+ lparams.join(', ') +"}";
+
+def result = null;  
+def error = null; 
+def errmsg = null; 
+try {
+	def svc = SERVICE.lookup('QueueReportService', 'main'); 
+	result = svc.getReport( PARAMS ); 
+	if ( ! result?.resultdata ) { 
+		errmsg = 'No available record(s) that matches your criteria.'; 
+	} 
+} catch(Throwable t) {
+	error = t; 
+	errmsg = t.message; 
+	t.printStackTrace(); 
+} 
+%>
+
+<style>
+.formpanel > tbody > tr > td.formlabel { width:100px; }
+.formpanel > tbody > tr > td { padding-bottom:5px; }
+.tableHeader { background-color:#efefef; padding: 10px;font-size: 20px;}
+.result > tbody > tr > td { padding:5px; }
+.tableContent {border-bottom: solid #eee 1px;}
+.result .integer { text-align:center; }
+</style>
+
+<script>
+\$put('report', new function(){ 
+	this.back = function() {
+		var elem = \$('#formsubmit');
+		elem.submit(); 
+	} 
+	this.print = function() {
+		window.print();
+		return "_close"
+	}
+}); 
+</script> 
+
+<form id="formsubmit" action="${PAGE.parentPath}" method="POST" style="visibility:hidden;"> 
+<% PARAMS.each { k,v-> %>
+	<input type="hidden" name="${k}" value="${v}"/> 
+<%}%>
+</form> 
+
+<div style="padding-top:5px;"></div>
+<table cellpadding="0" cellspacing="0" border="0">
+<tr>
+	<td>		
+		<input type="button" r:context="report" r:name="back" value="Back" class="btn btn-primary"/> 
+		<%if ( !errmsg ) { %> 
+		<button id="btnExportExcel" class="btn btn-primary">Export</button>
+		<input type="button" r:context="report" r:name="print" value="Print" class="btn btn-primary"/> 
+		<%}%>
+	</td>
+</tr>
+</table>
+
+<table class="result" style="width:100%;"> 
+<tbody>
+	<tr>	
+		<td><h4 style="margin-bottom:0px;"> ${PAGE.title} </h4></td> 
+	</tr>
+	<tr>
+		<td style="padding-top:0px;">${result.periodtitle}</td>
+	</tr>
+</tbody> 
+</table> 
+
+<%if ( errmsg ) { %> 
+	<br/> 
+	<div class="error" style="font-size:12pt;color:red;"> 
+		${errmsg} 
+	</div> 
+<%}%>
+
+
+<%
+if ( result?.resultdata ) { 
+	def numformatter = new java.text.DecimalFormat('#,##0');
+	def groupdata = result.resultdata.groupBy{[ key: it.sectionid, title: it.sectiontitle ]} 
+	groupdata.each{ k,v-> 
+		k.closedcount = v.sum{( it.closedcount ? it.closedcount : 0 )} 
+		k.skipcount = v.sum{( it.skipcount ? it.skipcount : 0 )} 
+		k.closedcountfmt = numformatter.format( k.closedcount );  
+		k.skipcountfmt = numformatter.format( k.skipcount );  
+		
+		def datahours = []; 
+		v.groupBy{ it.txnhour }.each{ kk,vv-> 
+			datahours << [ 
+				key: kk, 
+				skipcount: vv.sum{( it.skipcount ? it.skipcount : 0 )}, 
+				closedcount: vv.sum{( it.closedcount ? it.closedcount : 0 )} 
+			]; 
+		}
+
+		def maxhour = datahours.max{ it.key } 
+		maxhour = (maxhour?.key ? maxhour.key : 0);
+		for ( int ihour=0; ihour<maxhour; ihour++ ) {
+			def o = datahours.find{ it.key==ihour } 
+			if ( !o ) datahours << [key: ihour, closedcount:0]; 
+		}
+
+		datahours.sort{ it.key } 
+		k.jsondata = datahours.collect{ it.closedcount }.toString(); 
+	} 
+%>
+
+<div id="table_wrapper">
+	<br/> 
+	<table class="result" style="width:100%;"> 
+	<tbody>
+		<tr class="tableHeader">
+			<td> Section </td>
+			<td class="integer"> Total Served </td>
+			<td class="integer"> Total Skip </td>
+		</tr>
+		<% groupdata.each{ k,v-> %>
+		<tr class="tableContent">
+			<td> ${k.title} </td>
+			<td class="integer"> ${k.closedcountfmt} </td>
+			<td class="integer"> ${k.skipcountfmt} </td>
+		</tr>
+		<%}%>
+	</tbody>
+	</table> 
+</div>
+<br/> 
+<br/>
+<div id="chartpanel" style="height:300px; border:1px solid #efefef;"></div>
+<script> 
+Highcharts.chart('chartpanel', { 
+    title: {
+        text: 'Served Queue Transactions'
+    }, 
+    subtitle: { 
+        text: '${result.periodtitle}' 
+    },
+    yAxis: {
+        title: { text: 'Count' }
+    },
+    xAxis: {
+    	allowDecimals: false,
+    	title: { text: 'Time ( Hour )'},
+    	categories: ['12AM','1','2','3','4','5','6','7','8','9','10','11','12PM']
+    },
+    legend: {
+        layout: 'vertical',
+        align: 'right',
+        verticalAlign: 'middle'
+    },
+    plotOptions: {
+    	series: {
+        	allowPointSelect: false, 
+        	pointInterval: 1
+    	}
+	},
+    series: [ 
+		<% groupdata.each{ k,v-> %>
+		{
+			name: "${k.title}", 
+			data: ${k.jsondata}
+		}, 
+		<%}%>
+	] 
+});
+</script> 
+
+<%}%>

@@ -1,0 +1,104 @@
+@import url(../common.css);
+
+html {
+	font-family: "Lucida Grande", "Lucida Sans Unicode", Arial, Helvetica, sans-serif;
+	font-size: 11pt;
+}
+body {
+	background-color: #fff; 
+	margin: 0; 
+}
+.container{
+	margin: 0 auto;
+}
+.page-header {
+	margin-top: 30px;
+	border: 1px solid;
+	border-color: transparent; 	
+	background-color: transparent;
+	width: 	100%;
+	margin-top: 50px;
+}
+.page-header img {
+	margin: 0 auto;
+	height: 100px;
+	padding-left: 8px;
+	display: block;
+}
+.page-content {
+	width: 300px;
+	margin: 0 auto;
+	font-size: 12px;
+}
+.page-content h1{
+	padding:0px 0px 10px 0px;
+	margin: 0;
+	font-size: 14px;
+	text-align: center;
+}
+.login-content{
+	padding-top: 20px;
+
+}
+.login-editor input{
+	padding: 3px;
+}
+@media screen and (min-width: 680px) {
+	 .login-actions input{
+    margin-top: 5px;
+    text-align: center;
+    margin: 0 auto;
+    padding: 6px;
+    width: 210px;
+    color: #fff;
+    background-color: #0d407d;
+    border: none;
+	}
+   .login-actions input{
+    text-align: center;
+    margin: 0 auto;
+    padding: 6px;
+    width: 180px;
+    color: #fff;
+    background-color: #0d407d;
+    border: none;
+	}
+}
+@media screen and (min-width: 230px) {
+
+.login-editor input{
+	font-size: 15px;
+	padding: 3px;
+	width: 230px;
+	height: 30px;
+	}
+   .login-actions input{
+    text-align: center;
+    margin: 0 auto;
+    padding: 16px;
+    width: 220px;
+    height: 40px;
+    color: #fff;
+    background-color: #0d407d;
+    border: none;
+	}
+}
+@media screen and (min-width: 480px) {
+
+	.login-editor input{
+	font-size: 12px;
+	padding: 3px;
+	width: 200px;
+	height: 20px;
+	}
+    .login-actions input{
+    margin-top: 5px;
+    text-align: center;
+    margin: 0 auto;
+    padding: 6px;
+    width: 210px;
+    color: #fff;
+    background-color: #0d407d;
+    border: none;
+	}
+}

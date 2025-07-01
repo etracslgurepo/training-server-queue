@@ -1,0 +1,51 @@
+import com.rameses.annotations.*;
+import com.rameses.common.*;
+import com.rameses.util.*;
+
+class WsQueueChannelListener {    
+
+	@XConnection("queue_poll")
+	def queue_poll; 
+
+	@XConnection("paging_poll")
+	def paging_poll; 
+
+	@Service 
+	def self; 
+
+	@Context
+	def ctx; 
+
+	@OnMessage('ws_queue_listener') 
+	void receive( data ) { 
+		println '[WsQueueChannelListener] ' + data; 
+		self.notifyQueuePoll( data );
+		self.notifyPagingPoll( data );
+	} 
+
+	@Async 
+	@ProxyMethod(local=true) 
+	void notifyQueuePoll( data ) { 
+		if ( data ) { 
+			queue_poll.send( data ); 
+		} 
+	}
+
+	@Async 
+	@ProxyMethod(local=true) 
+	void notifyPagingPoll( data ) { 
+		if ( data ) { 
+			def vv = ctx.conf['paging_poll.enabled']; 
+			if (vv.toString().equals('false')) return; 
+			
+			if ( !data.msg ) {
+				def buff = new StringBuilder(); 
+				data.ticketno.toString().toCharArray().each{
+					buff.append(''+ it +', ');
+				}
+				data.msg = 'Ticket Number, '+ buff +' Please proceed to counter '+ data.countercode;
+			}
+			paging_poll.send( data ); 
+		} 
+	}
+} 

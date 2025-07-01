@@ -1,0 +1,7 @@
+{
+	'app.cluster'	: '${app.cluster}',
+	'app.host'		: 'localhost:19070',
+	'app.context'	: 'queue',
+	readTimeout 	: '60000',
+	handler			: 'script'
+}

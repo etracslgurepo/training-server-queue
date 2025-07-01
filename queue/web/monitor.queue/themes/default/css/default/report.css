@@ -1,0 +1,150 @@
+@import url(bootstrap.min.css);
+@import url(font-awesome.min.css);
+
+/*!
+ * Start Bootstrap - SB Admin 2 v3.3.7+1 (http://startbootstrap.com/template-overviews/sb-admin-2)
+ * Copyright 2013-2016 Start Bootstrap
+ * Licensed under MIT (https://github.com/BlackrockDigital/startbootstrap/blob/gh-pages/LICENSE)
+ */
+body {
+  background-color: #f8f8f8;
+}
+#wrapper {
+  width: 100%;
+}
+#page-wrapper {
+  padding: 0 15px;
+  min-height: 568px;
+  background-color: white;
+}
+@media (min-width: 768px) {
+  #page-wrapper {
+    position: inherit;
+    margin: 0 0 0 190px;
+    padding: 0 30px;
+    border-left: 1px solid #e7e7e7;
+  }
+}
+.navbar-top-links {
+  margin-right: 0;
+}
+.navbar-top-links li {
+  display: inline-block;
+}
+.navbar-top-links li:last-child {
+  margin-right: 15px;
+}
+.navbar-top-links li a {
+  padding: 15px;
+  min-height: 50px;
+}
+.nav>li>p {
+  font-size: 14px;
+    position: relative;
+    display: block;
+    padding: 0 0px 0px 10px;
+    margin: 0;
+    background: #cccccc;
+}
+.nav>li>a {
+    position: relative;
+    display: block;
+    padding: 0px 15px;
+}
+.sidebar .sidebar-nav.navbar-collapse {
+  padding-left: 0;
+  padding-right: 0;
+}
+.sidebar .sidebar-search {
+  padding: 15px;
+}
+.sidebar ul li {
+  border-bottom: 1px solid #e7e7e7;
+}
+.sidebar ul li a.active {
+  background-color: #eeeeee;
+}
+.sidebar .arrow {
+  float: right;
+}
+.sidebar .fa.arrow:before {
+  content: "\f104";
+}
+.sidebar .active > a > .fa.arrow:before {
+  content: "\f107";
+}
+.sidebar .nav-second-level li,
+.sidebar .nav-third-level li {
+  border-bottom: none !important;
+}
+.sidebar .nav-second-level li a {
+  padding-left: 37px;
+}
+@media (min-width: 768px) {
+  .sidebar {
+    z-index: 1;
+    position: absolute;
+    width: 190px;
+    margin-top: 51px;
+    font-size: 12px;
+  }
+  .navbar-top-links .dropdown-messages,
+  .navbar-top-links .dropdown-tasks,
+  .navbar-top-links .dropdown-alerts {
+    margin-left: auto;
+  }
+}
+.navbar-brand {
+    float: left;
+    height: 50px;
+    padding: 8px 15px;
+}
+.pal-logo img{
+  height: 40px;
+}
+.table-striped > tbody > tr:nth-child(2n+1) > td, .table-striped > tbody > tr:nth-child(2n+1) > th {
+   background-color: #efefef;
+}
+.group-colheader{
+  text-align: center;
+}
+
+@media print {
+
+    .btn{display: none !important;}
+
+  }
+
+   .rameses-logo{
+    padding-top:10px; 
+  }
+  .logout{
+    float:right; 
+    padding:20px 50px 10px 40px;
+  }
+@media only screen  and (min-device-width: 320px) and (max-device-width: 480px) {
+
+  .pal-logo img{
+    height: 40px;
+  }
+  .rameses-logo{
+   width: 100px;
+   padding-top: 15px;
+   padding-left: 5px;
+  }
+  .logout{
+  float:right; 
+  padding:15px 50px 0px 0px;
+  }
+  .navbar-brand {
+    padding: 10px 0px 0px 0px;
+  }
+}
+
+@media (min-width: 768px) {
+
+  .navbar-header {
+      width: 100%;
+  }
+
+} 
