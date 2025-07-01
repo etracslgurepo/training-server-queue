@@ -1,0 +1,48 @@
+=================
+Restore Databases
+=================
+
+This document will guide you in restoring 
+the initial databases that are needed in 
+running the ETRACS application.
+
+
+1. Open a Command Prompt console from this location "_res/_initial/mysql"
+
+
+2. Restore the "eor" database 
+
+   mysql -u root -p -f  <  00-training_eor.sql
+
+
+3. Restore the "etracs" database 
+
+   mysql -u root -p -f  <  01-training_etracs.sql
+
+
+4. Restore the "notification" database 
+
+   mysql -u root -p -f  <  02-training_notification.sql
+
+
+5. Restore the "image" database 
+
+   mysql -u root -p -f  <  03-training_image.sql
+
+
+6. Restore the "queue" database 
+
+   mysql -u root -p -f  <  04-training_queue.sql
+
+
+7. Patch the "eor" database 
+
+   mysql -u root -p -f  <  10-patch-eor.sql
+
+
+8. Patch the "etracs" database 
+
+   mysql -u root -p -f  <  11-patch-eor.sql
+
+
+DONE !!!
