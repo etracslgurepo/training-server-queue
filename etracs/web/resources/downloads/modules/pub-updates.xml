@@ -36,7 +36,5 @@ admin.app.context=etracs25
    <import file="bpls/pub-updates.pxml"/>   
 
    <import file="queue/updates.pxml"/> 
-
-   <import file="epayment/pub-updates.pxml"/> 
 </modules>
 </app>
