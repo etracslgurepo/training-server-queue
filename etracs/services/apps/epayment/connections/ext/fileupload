@@ -1,7 +1,0 @@
-provider=fileupload
-host=192.168.2.15
-port=7000
-channel=${fileserver_channel}
-uploadDir=${fileserver_dir}/uploads
-downloadDir=${fileserver_dir}/downloads
-debug=true
