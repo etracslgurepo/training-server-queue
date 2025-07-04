@@ -19,3 +19,43 @@ _tmp
 /zzz
 **/resources/platform/etracs255-platform/**
 zzz-custom
+
+
+
+# dependencies
+/react/node_modules
+/react/.pnp
+/react/.pnp.js
+/react/.yarn/install-state.gz
+
+# testing
+/react/coverage
+
+# next.js
+/react/.next/
+/react/out/
+
+# production
+/react/build
+
+# misc
+/react/.DS_Store
+/react/*.pem
+
+# debug
+/react/npm-debug.log*
+/react/yarn-debug.log*
+/react/yarn-error.log*
+
+# local env files
+/react/.env*.local
+
+# vercel
+/react/.vercel
+
+# typescript
+/react/*.tsbuildinfo
+/react/next-env.d.ts
+
+/react/*.swp
+/react/*.save
