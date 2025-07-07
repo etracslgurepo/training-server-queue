@@ -1,0 +1,31 @@
+import com.rameses.annotations.*;
+
+class QueueMonitorService { 
+
+	@ActiveDB(value='queue_monitor', adapter="queue")
+	def qmDb;
+
+	@DataContext( dynamic=true )
+	def dynaEm;
+
+	@ProxyMethod 
+	public def getActiveList( Map param ) {
+		if ( !param?.groupid ) throw new Exception('groupid  parameter is required'); 
+
+		def list = qmDb.getActiveList( param ); 
+		def formatter = new java.text.DecimalFormat('000'); 
+
+		list.each{ 
+			it.uuid = "${it.sectionid}_${it.counterid}".toString(); 
+			it.ticketno = [ it.prefix, formatter.format( it.seriesno )].collect{ it }.join(''); 
+			it.formattedseriesno = it.ticketno; 
+		}
+		return list; 
+	} 
+
+	@ProxyMethod 
+	public def getAnnouncement() {
+		def em = dynaEm.lookup('queue_announcement');
+		return em.find([ objid: 'announcement' ]).first(); 
+	} 
+} 
