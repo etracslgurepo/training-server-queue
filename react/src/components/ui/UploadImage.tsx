@@ -4,59 +4,64 @@ const ImageUpload = ({
   onLogoUploaded,
   removeLogoImage,
   title,
+  imgUrl
 }: {
   onLogoUploaded: (image: string) => void;
   removeLogoImage: () => void;
   title?: string;
+  imgUrl?: string;
 }) => {
   const [image, setImage] = useState<File | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null); // Store the uploaded image URL
 
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files && event.target.files[0];
     if (file) {
       setImage(file);
-    }
-  };
-
-  const handleUpload = () => {
-    if (image) {
       const reader = new FileReader();
       reader.onload = () => {
         const dataUrl = reader.result as string;
+        setImageUrl(dataUrl); // Set the image URL state
         onLogoUploaded(dataUrl); // Pass the image data URL to the parent component
       };
-      reader.readAsDataURL(image);
+      reader.readAsDataURL(file); // Convert the image to a base64 string
     }
   };
 
+  const handleRemoveImage = () => {
+    setImage(null);
+    setImageUrl(null); // Clear the image and URL states
+    removeLogoImage(); // Call the removeLogoImage function from the parent
+  };
+
   return (
-    <div className="flex justify-center items-center text-[10px] p-4">
-      <h1 className="text-lg pb-1">{title}</h1>
+    <div className="flex flex-col items-center text-[10px]">
+      <h1 className="text-lg pb-2">{title}</h1>
+      
+      {/* Display image if it's uploaded */}
+      {imgUrl ? (
+        <div className="w-[80px] h-[80px] mb-2">
+          <img src={imgUrl || "/images/lgu-logo.png"} alt="Uploaded" className="w-full h-full object-cover rounded-md" />
+        </div>
+      ) : (
+        <p className="text-sm text-gray-500">No image uploaded</p>
+      )}
+
+      {/* File input */}
       <input
         type="file"
         accept="image/*"
         onChange={handleImageChange}
-        className=" rounded w-[160px]"
+        className="mb-2 rounded p-2 border"
       />
-      <div className="flex gap-2">
-        <button
-          onClick={handleUpload}
-          disabled={!image}
-          className={`px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-400 transition duration-200 ${
-            !image && "opacity-50 cursor-not-allowed"
-          }`}
-        >
-          Upload
-        </button>
 
-        {removeLogoImage && (
-          <button
-            className={`px-2 py-1 bg-gray-500 text-white rounded hover:bg-gray-400 transition duration-200`}
-            onClick={removeLogoImage}
-          >
-            remove
-          </button>
-        )}
+      <div className="flex gap-2">
+        <div
+          onClick={handleRemoveImage}
+          className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-400 transition duration-200 cursor-pointer"
+        >
+          Remove
+        </div>
       </div>
     </div>
   );
