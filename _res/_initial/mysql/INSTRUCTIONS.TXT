@@ -42,7 +42,7 @@ running the ETRACS application.
 
 8. Patch the "etracs" database 
 
-   mysql -u root -p -f  <  11-patch-eor.sql
+   mysql -u root -p -f  <  11-patch-etracs.sql
 
 
 DONE !!!
