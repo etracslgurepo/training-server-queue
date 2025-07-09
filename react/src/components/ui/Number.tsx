@@ -1,16 +1,15 @@
 import React from "react";
 
 interface NumberProps {
-  number: string | number | null | undefined;
-  text?: string | number | undefined;
   className?: string;
+  children: React.ReactNode;
 }
 
-const Number: React.FC<NumberProps> = ({ number, className, text }) => {
+const Number: React.FC<NumberProps> = ({ children, className = "" }) => {
   return (
     <div>
       <p className={`text-3xl font-bold ${className}`}>
-        {text} {number !== undefined ? number : ""}
+        {children}
       </p>
     </div>
   );

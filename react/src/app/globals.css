@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+/* styles/globals.css */
+
+* {
+  box-sizing: border-box;
+}
+
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.blinking {
+  animation: blink 1s steps(5, start) infinite;
+}
+
+.text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
+.underline-hover {
+  position: relative;   
+}
+.underline-hover:before {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  height: 3px;
+  width: 0;
+  background: #641AE6;
+  border-radius: 50px;
+  transition:0.3s ease-in-out;
+}
+.underline-hover:hover:before {
+  width: 70%;
+}
+
+/* mobile hover */
+
+.underline-hover-mobile {
+  position: relative;   
+}
+.underline-hover-mobile:before {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  height: 3px;
+  width: 0;
+  background: #641AE6;
+  border-radius: 50px;
+  transition:0.3s ease-in-out;
+}
+.underline-hover-mobile:hover:before {
+  width: 20%;
+}
+
+

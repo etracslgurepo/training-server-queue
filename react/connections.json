@@ -1,0 +1,40 @@
+{
+  "gdx": {
+    "app.host": "${NEXT_PUBLIC_CLOUD_SERVER_IP}:3000",
+    "readTimeout": 60000
+  },
+  "etracs": {
+    "app.host": "${NEXT_PUBLIC_ETRACS_SERVER_IP}:18070",
+    "app.cluster": "osiris3",
+    "app.context": "etracs25",
+    "handler": "script",
+    "readTimeout": 60000
+  },
+  "main": {
+    "app.host": "${NEXT_PUBLIC_ETRACS_SERVER_IP}:18070",
+    "app.cluster": "osiris3",
+    "app.context": "etracs25",
+    "handler": "script",
+    "readTimeout": 60000
+  },
+  "queue": {
+    "app.host": "${NEXT_PUBLIC_ETRACS_SERVER_IP}:18070",
+    "app.cluster": "osiris3",
+    "app.context": "etracs25",
+    "handler": "script",
+    "readTimeout": 60000
+  },
+  "partner": {
+    "app.host": "${NEXT_PUBLIC_FILIPIZEN_HOST}",
+    "app.cluster": "cloud-server",
+    "app.context": "partner",
+    "handler": "script",
+    "readTimeout": 60000
+  },
+  "epayment": {
+    "app.host": "${NEXT_PUBLIC_CLOUD_EPAYMENT_HOST}"
+  },
+  "obo": {
+    "app.host": "${NEXT_PUBLIC_CLOUD_OBO_HOST}"
+  }
+}

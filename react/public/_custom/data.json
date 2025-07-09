@@ -1,0 +1,59 @@
+{
+  "general": {
+    "logoUrl": "/images/lgu-logo.png",
+    "fontFamily": "Arial",
+    "lguname": "",
+    "slidemessage": "",
+    "buzz": "/sound/take_number_sound.mp3"
+  },
+  "group": [
+    {
+      "id": "bpls",
+      "color": "#335F96",
+      "showReserveTicket": true,
+      "showVideo": true,
+      "videoUrl": "https://www.youtube.com/watch?v=x2gi5nLZFwY",
+      "videoposition": "main-left",
+      "videoLayout": "standard",
+      "windowposition": "main-right",
+      "xyAxis": "vertical",
+      "rowCount": "4",
+      "columnCount": "1",
+      "bgUrl": "/images/default-background.png",
+      "bgSize": "auto",
+      "windowCount": "4"
+    },
+    {
+      "id": "rpt",
+      "color": "#00ff00",
+      "showReserveTicket": false,
+      "showVideo": true,
+      "videoUrl": "https://www.youtube.com/watch?v=x2gi5nLZFwY",
+      "videoposition": "main-left",
+      "videoLayout": "standard",
+      "windowposition": "main-right",
+      "xyAxis": "vertical",
+      "rowCount": "4",
+      "columnCount": "1",
+      "bgUrl": "/images/default-background.png",
+      "bgSize": "auto",
+      "windowCount": "4"
+    },
+    {
+      "id": "tc",
+      "color": "#335F96",
+      "showReserveTicket": false,
+      "showVideo": true,
+      "videoUrl": "https://www.youtube.com/watch?v=x2gi5nLZFwY",
+      "videoposition": "main-left",
+      "videoLayout": "standard",
+      "windowposition": "main-right",
+      "xyAxis": "vertical",
+      "rowCount": "4",
+      "columnCount": "1",
+      "bgUrl": "/images/default-background.png",
+      "bgSize": "auto",
+      "windowCount": "4"
+    }
+  ]
+}
