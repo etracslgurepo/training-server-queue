@@ -5,6 +5,9 @@ class QueueService {
 	@Service( dynamic=true )
 	def dynaSvc; 
 
+	@DataContext( dynamic=true )
+	def dynaEm; 
+
 
 	@ProxyMethod 
 	public def getGroups() {
@@ -38,4 +41,12 @@ class QueueService {
 		return svc.fetchNextTicket( param ); 
 	}
 
+
+	@ProxyMethod 
+	public def getGroup( param ) { 
+		if ( !param.objid ) throw new Exception('objid parameter is required');
+
+		def em = dynaEm.lookup('queue_group'); 
+		return em.find([ objid: param.objid ]).first(); 
+	} 
 } 
