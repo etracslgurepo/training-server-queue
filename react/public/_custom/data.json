@@ -10,9 +10,11 @@
     {
       "id": "bpls",
       "color": "#335F96",
-      "showReserveTicket": true,
+      "showReserveTicket": false,
       "showVideo": true,
-      "videoUrl": "https://www.youtube.com/watch?v=x2gi5nLZFwY",
+      "videoUrl": [
+        "https://www.youtube.com/watch?v=x2gi5nLZFwY"
+      ],
       "videoposition": "main-left",
       "videoLayout": "standard",
       "windowposition": "main-right",
@@ -44,16 +46,18 @@
       "color": "#335F96",
       "showReserveTicket": false,
       "showVideo": true,
-      "videoUrl": "https://www.youtube.com/watch?v=x2gi5nLZFwY",
+      "videoUrl": [
+        "https://www.youtube.com/watch?v=x2gi5nLZFwY"
+      ],
       "videoposition": "main-left",
       "videoLayout": "standard",
       "windowposition": "main-right",
       "xyAxis": "vertical",
-      "rowCount": "4",
+      "rowCount": "3",
       "columnCount": "1",
-      "bgUrl": "/images/default-background.png",
+      "bgUrl": "",
       "bgSize": "auto",
-      "windowCount": "4"
+      "windowCount": "5"
     }
   ]
 }

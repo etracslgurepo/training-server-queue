@@ -1,6 +1,8 @@
 import React from "react";
 import QueueItem from "./QueueItem";
 import Text from "@/components/ui/Text";
+import TimeDate from "../io/Time&Date";
+import { useData } from "@/context/DataContext";
 
 const QueueGroup = ({
   props,
@@ -21,6 +23,9 @@ const QueueGroup = ({
   windowCount?: number | string;
   blinkingTicket?: string;
 }) => {
+
+  const {general} = useData()
+
   const numColumnCount = Number(columnCount);
   const numRowCount = Number(rowCount);
   const numWindowCount = Number(windowCount);
@@ -65,17 +70,26 @@ const QueueGroup = ({
 
   return (
     <div id={componentType} className="w-full">
-      <Text className="text-[28px] leading-6 absolute top-[90px] !font-bold uppercase text-start">
+      {/* <Text className="text-[32px] leading-6 absolute top-[90px] pt-4 !font-bold uppercase text-start">
+        now serving
+      </Text> */}
+      <div className="flex items-center justify-between px-1">
+  <Text className="text-[30px] !font-bold uppercase" >
         now serving
       </Text>
-
-      <div style={containerStyle} className={classname}>
+      <TimeDate
+            componentType={undefined}
+            className=""
+            fontFamily={general.fontFamily}
+          />
+      </div>
+      
+      <div style={containerStyle} className={`${classname} pt-[10px]`}>
         {displayTickets.map((ticket, index) => (
           <QueueItem
             key={index}
             props={ticket}
-            className={ticket?.ticketno === blinkingTicket ? "blinking" : ""}
-          />
+         blinkingTicket={ticket?.ticketno === blinkingTicket ? "blinking" : ""}          />
         ))}
       </div>
     </div>

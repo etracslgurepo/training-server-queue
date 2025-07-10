@@ -99,13 +99,15 @@ const QueueMonitor = ({ group }: QueueMonitorProps) => {
         // setTicketQueue((prevQueue) => [...prevQueue, data]);
       } else if (data.type === "BUZZ_NUMBER") {
         // Process buzz and text-to-speech immediately
-        await playBuzz();
-        await setBlinkingTicket(data.ticketno);
-        await textToSpeech(data.countercode, data.ticketno);
+     await playBuzz();
+  await setBlinkingTicket(data.ticketno);
 
-        setTimeout(() => {
-          setBlinkingTicket(null); // Stop the blinking effect after 5 seconds
-        }, 5000);
+  // ✅ Start blink timeout immediately (not after TTS)
+  setTimeout(() => {
+    setBlinkingTicket(null);
+  }, 5000);
+
+  await textToSpeech(data.countercode, data.ticketno);
       } else if (data.type === "CONSUME_NUMBER") {
         // Remove consumed ticket from the active list
         setTicketInfo((prevTickets) =>
@@ -119,7 +121,7 @@ const QueueMonitor = ({ group }: QueueMonitorProps) => {
   const isQueueGroupRight = groups.windowposition === "main-right";
 
   return (
-    <div className={`flex flex-col min-hscreen "}`}>
+    <div className={`flex flex-col }`}>
       {/* Main content */}
       <div className="flex-grow flex w-full gap-4 px-4 py-2">
         {/* Left Video */}
@@ -129,7 +131,7 @@ const QueueMonitor = ({ group }: QueueMonitorProps) => {
               componentType={
                 groups.showVideo ? `${groups.videoposition}` : "none"
               }
-              videoLink={groups.videoUrl}
+              videoLinks={groups.videoUrl}
               layoutType={groups.videoLayout}
               rowCount={groups.rowCount || groups.windowCount}
             />
@@ -138,7 +140,7 @@ const QueueMonitor = ({ group }: QueueMonitorProps) => {
 
         {/* Queue Group */}
         <div
-          className={`pt-10 ${isQueueGroupRight ? "ml-auto" : ""} ${
+          className={`pt-2 ${isQueueGroupRight ? "ml-auto" : ""} ${
             !groups.showVideo ? "w-full" : "w-1/2"
           }`}
         >
@@ -172,7 +174,7 @@ const QueueMonitor = ({ group }: QueueMonitorProps) => {
               componentType={
                 groups.showVideo ? `${groups.videoposition}` : "none"
               }
-              videoLink={groups.videoUrl}
+                   videoLinks={groups.videoUrl}
               layoutType={groups.videoLayout}
               rowCount={groups.rowCount}
             />

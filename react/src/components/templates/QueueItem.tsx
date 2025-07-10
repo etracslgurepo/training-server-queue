@@ -13,6 +13,7 @@ export type QueueItemProps = {
   borderLine?: string;
   hideSectionTitle?: boolean;
   counterCodeWidth?: string;
+    blinkingTicket: string
 };
 const QueueItem: React.FC<QueueItemProps> = ({
   props,
@@ -25,7 +26,8 @@ const QueueItem: React.FC<QueueItemProps> = ({
   textSize,
   borderLine,
   hideSectionTitle,
-  counterCodeWidth
+  counterCodeWidth,
+  blinkingTicket
 }) => {
   const isEmpty = !props || Object.keys(props).length === 0;
 
@@ -48,18 +50,17 @@ const QueueItem: React.FC<QueueItemProps> = ({
       >
         {isEmpty ? (
           <div className="flex flex-col items-center justify-center text-gray-400 w-full">
-            <p className="text-xl font-bold">_ _ _</p>
           </div>
         ) : (
           <div
             className="flex flex-row w-full h-full gap-x-2 items-center"
             style={{ fontFamily }}
           >
-            <p className={`font-bold text-5xl w-[150px] text-center ${textSize} ${counterCodeWidth}`}>{props.countercode}</p>
-            <div className={`border border-black border-solid pt-20 ${borderLine}`} />
-            <div className="flex flex-col items-center justify-center text-center w-full h-full">
-              <p className={`font-bold text-5xl ${textSize}`}>{props.ticketno}</p>
-              {hideSectionTitle ? ( "" ): (<p className="uppercase">{props.sectiontitle}</p>)}
+            <p className={`font-bold text-[55px] w-[150px] text-center ${textSize} ${counterCodeWidth}`}>{props.countercode}</p>
+            <div className={`border border-gray-500/20 pt-20 ${borderLine}`} />
+            <div className="flex flex-col items-center justify-center text-center w-full h-full ">
+              <p className={`font-bold text-[45px] leading-none ${textSize} ${blinkingTicket}`}>{props.ticketno}</p>
+              {hideSectionTitle ? ( "" ): (<p className="uppercase w-full leading-none">{props.sectiontitle}</p>)}
             
             </div>
           </div>

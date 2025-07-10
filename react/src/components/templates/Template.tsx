@@ -17,7 +17,8 @@ type QueueMonitorProps = {
 const Template = ({ children, group }: QueueMonitorProps) => {
   const [datas, setDatas] = useState<Record<string, any>>({});
   const { groups, general } = useData();
-  const { blinkingTicket, ticketInfo, announcement, setAnnouncement } = useQueueTicket();
+  const { blinkingTicket, ticketInfo, announcement, setAnnouncement } =
+    useQueueTicket();
 
   const fetchData = async () => {
     let newConf = {};
@@ -75,7 +76,7 @@ const Template = ({ children, group }: QueueMonitorProps) => {
   }, [general.lguname]);
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col h-screen">
       <Header props={datas} color={groups.color} lgulogo={general.logoUrl} />
       <main
         className="flex-1"
@@ -101,14 +102,15 @@ const Template = ({ children, group }: QueueMonitorProps) => {
               <QueueItem
                 key={index}
                 props={ticket || {}}
-                className={`${ticket.ticketno ? "" : "opacity-50"} ${
-                  ticket?.ticketno === blinkingTicket ? "blinking" : ""
-                }`}
+                className={`${ticket.ticketno ? "" : "opacity-50"} `}
                 height="70px"
                 textSize="!text-3xl"
                 borderLine="pt-8"
                 counterCodeWidth="w-auto"
                 hideSectionTitle
+                blinkingTicket={`${
+                  ticket?.ticketno === blinkingTicket ? "blinking" : ""
+                }`}
               />
             ))}
           </>
@@ -117,17 +119,15 @@ const Template = ({ children, group }: QueueMonitorProps) => {
 
       {announcement && (
         <div className="bg-gradient-to-b from-gray-100/80 to-gray-300/60 h-[60px] flex items-center justify-around">
-
-            <SlideMessage
-              message={
-                typeof announcement === "object"
-                  ? announcement?.content
-                  : announcement
-              }
-              className="text-center w-full text-3xl"
-              duration={100}
-            />
-     
+          <SlideMessage
+            message={
+              typeof announcement === "object"
+                ? announcement?.content
+                : announcement
+            }
+            className="text-center w-full text-3xl"
+            duration={100}
+          />
         </div>
       )}
 

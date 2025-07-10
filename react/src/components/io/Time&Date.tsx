@@ -20,9 +20,9 @@ const TimeDate: React.FC<TimeDateProps> = ({
       className={`flex items-center justify-center gap-5 ${className}`}
       style={{ fontFamily: fontFamily }}
     >
-      <Time />
+      <Time className={className} />
       <div className="h-[20px] bg-black w-[2px]"></div>
-      <DateComponent />
+      <DateComponent className={className} />
     </div>
   );
 };

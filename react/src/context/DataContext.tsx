@@ -7,7 +7,7 @@ interface GroupData {
   color: string;
   showReserveTicket: boolean;
   showVideo: boolean;
-  videoUrl: string;
+  videoUrl: string[];
   videoposition: string;
   videoLayout: "standard" | "info-panel";
   windowposition: string;
@@ -30,19 +30,19 @@ interface GeneralData {
 interface DataContextValue {
   groups: GroupData;
   general: GeneralData;
-  
   updateBgSize: (bgSize: "auto" | "contain" | "cover") => void;
   updateLogoUrl: (logoUrl: string) => void;
   removeLogoUrl: () => void;
   updateBgUrl: (bgUrl: string) => void;
   removeBgUrl: () => void;
   removeVideoUrl: () => void;
+  updateVideoUrls: (urls: string[]) => void;
   handleBgSizeChange: (bgSize: "auto" | "contain" | "cover") => void;
   handleChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   handleSelect: (event: React.ChangeEvent<HTMLSelectElement>) => void;
   handleSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   handlePositionChange: (name: string, value: string) => void;
-toggleReserveTicket: () => void;
+  toggleReserveTicket: () => void;
   toggleVideo: () => void;
   resetData: () => void;
   groupId: string;
@@ -59,18 +59,17 @@ const createDefaultGroup = (id: string): GroupData => ({
   color: "#335F96",
   showReserveTicket: false,
   showVideo: true,
-  videoUrl: "https://www.youtube.com/watch?v=x2gi5nLZFwY",
+  videoUrl: ["https://www.youtube.com/watch?v=x2gi5nLZFwY"],
   videoposition: "main-left",
   videoLayout: "standard",
   windowposition: "main-right",
   xyAxis: "vertical",
-  rowCount: "4",
+  rowCount: "5",
   columnCount: "1",
-  windowCount: "4",
-  bgUrl: "/images/default-background.png",
-  bgSize: "auto" as const
+  windowCount: "5",
+  bgUrl: "",
+  bgSize: "auto",
 });
-
 
 const defaultGeneral: GeneralData = {
   logoUrl: "/images/lgu-logo.png",
@@ -89,6 +88,7 @@ const DataContext = createContext<DataContextValue>({
   updateBgUrl: () => {},
   removeBgUrl: () => {},
   removeVideoUrl: () => {},
+  updateVideoUrls: () => {},
   handleBgSizeChange: () => {},
   handleChange: () => {},
   handleSelect: () => {},
@@ -118,9 +118,17 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children, groupId = 
       .then((data) => {
         if (data.group) {
           const groupData = data.group.find((g: GroupData) => g.id === groupId);
-          if (groupData) {
-            setGroups(groupData);
-          }
+     if (groupData) {
+  setGroups({
+    ...groupData,
+    videoUrl: Array.isArray(groupData.videoUrl)
+      ? groupData.videoUrl
+      : groupData.videoUrl
+      ? [groupData.videoUrl]
+      : [""],
+  });
+}
+
         } else {
           console.error("Groups data is undefined");
         }
@@ -161,7 +169,6 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children, groupId = 
         [name]: value,
       }));
     }
-    
   };
 
   const handlePositionChange = (name: string, value: string) => {
@@ -188,11 +195,16 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children, groupId = 
       bgSize,
     }));
   };
-  
+
+  const updateVideoUrls = (urls: string[]) => {
+    setGroups((prev) => ({
+      ...prev,
+      videoUrl: urls,
+    }));
+  };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
     try {
       const response = await fetch("/api/data/update", {
         method: "POST",
@@ -204,9 +216,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children, groupId = 
           general: general,
         }),
       });
-
       const result = await response.json();
-
       if (response.ok) {
         console.log("Updated data:", result);
       } else {
@@ -217,7 +227,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children, groupId = 
     }
   };
 
-    const toggleReserveTicket = () => {
+  const toggleReserveTicket = () => {
     setGroups((prev) => ({
       ...prev,
       showReserveTicket: !prev.showReserveTicket,
@@ -262,10 +272,9 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children, groupId = 
   const removeVideoUrl = () => {
     setGroups((prev) => ({
       ...prev,
-      videoUrl: "",
+      videoUrl: [""],
     }));
   };
-  
 
   const updateBgSize = (bgSize: "auto" | "contain" | "cover") => {
     setGroups((prev) => ({
@@ -273,19 +282,15 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children, groupId = 
       bgSize,
     }));
   };
-  
-  
 
- const resetData = () => {
-   const defaultGroup = createDefaultGroup(currentGroupId);
-  setGroups(defaultGroup);
-  setGeneral({
-    ...defaultGeneral,
-    lguname: "", // override to empty string
-  });
-};
-
-
+  const resetData = () => {
+    const defaultGroup = createDefaultGroup(currentGroupId);
+    setGroups(defaultGroup);
+    setGeneral({
+      ...defaultGeneral,
+      lguname: "",
+    });
+  };
 
   const setGroupId = (groupId: string) => {
     setCurrentGroupId(groupId);
@@ -302,6 +307,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children, groupId = 
         updateBgUrl,
         removeBgUrl,
         removeVideoUrl,
+        updateVideoUrls,
         handleChange,
         handleSelect,
         handleSubmit,
