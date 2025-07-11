@@ -47,7 +47,7 @@
       "showReserveTicket": false,
       "showVideo": true,
       "videoUrl": [
-        "https://www.youtube.com/watch?v=x2gi5nLZFwY"
+        "http://192.168.2.15:2180/videos/sample.mp4"
       ],
       "videoposition": "main-left",
       "videoLayout": "standard",
@@ -57,7 +57,7 @@
       "columnCount": "1",
       "bgUrl": "",
       "bgSize": "auto",
-      "windowCount": "5"
+      "windowCount": "3"
     }
   ]
 }

@@ -17,8 +17,12 @@ type QueueMonitorProps = {
 const Template = ({ children, group }: QueueMonitorProps) => {
   const [datas, setDatas] = useState<Record<string, any>>({});
   const { groups, general } = useData();
-  const { blinkingTicket, ticketInfo, announcement, setAnnouncement } =
-    useQueueTicket();
+  const {
+    blinkingTicket,
+    ticketInfo,
+    announcement,
+    setAnnouncement,
+  } = useQueueTicket();
 
   const fetchData = async () => {
     let newConf = {};
@@ -44,29 +48,24 @@ const Template = ({ children, group }: QueueMonitorProps) => {
     }
   };
 
+  const visibleWindowCount = Number(groups.windowCount || groups.rowCount || 0);
   const totalTickets = ticketInfo.length;
-  const maxMain = Number(groups.windowCount);
-  const reserveSlots = 5;
 
-  // Determine how many go to main vs reserve
-  let mainTickets: Record<string, any>[] = [];
-  let reserveTickets: Record<string, any>[] = [];
+  const mainTickets = ticketInfo.slice(0, visibleWindowCount);
+  const reserveTickets = ticketInfo.slice(visibleWindowCount);
 
-  if (totalTickets > maxMain) {
-    mainTickets = ticketInfo.slice(0, maxMain);
-    reserveTickets = ticketInfo.slice(maxMain);
-  } else {
-    mainTickets = ticketInfo;
-    reserveTickets = [];
-  }
+const paddedReserveTickets = Array.from(
+  { length: reserveTickets.length },
+  (_, index) => reserveTickets[index]
+);
 
-  // Pad reserve with empty slots to always show 4
-  const paddedReserveTickets = Array.from(
-    { length: reserveSlots },
-    (_, index) => {
-      return reserveTickets[index] || {}; // Fill with empty object if no ticket
-    }
-  );
+
+// const reserveSlots = Math.max(reserveTickets.length, 3); // Minimum 3 reserve slots
+// const paddedReserveTickets = Array.from(
+//   { length: reserveSlots },
+//   (_, index) => reserveTickets[index] || {}
+// );
+
 
   useEffect(() => {
     if (general.lguname !== "LGU name") {
@@ -91,29 +90,27 @@ const Template = ({ children, group }: QueueMonitorProps) => {
         {children}
       </main>
 
-      {groups.showReserveTicket && (
+      {reserveTickets.length > 0 && (
         <div
           className={`grid grid-cols-5 w-full gap-5 px-5 pb-2 ${
             groups.showVideo ? "pt-5" : "pt-16"
           } ${groups.videoLayout === "standard" ? "pt-14" : ""}`}
         >
-          <>
-            {paddedReserveTickets.map((ticket, index) => (
-              <QueueItem
-                key={index}
-                props={ticket || {}}
-                className={`${ticket.ticketno ? "" : "opacity-50"} `}
-                height="70px"
-                textSize="!text-3xl"
-                borderLine="pt-8"
-                counterCodeWidth="w-auto"
-                hideSectionTitle
-                blinkingTicket={`${
-                  ticket?.ticketno === blinkingTicket ? "blinking" : ""
-                }`}
-              />
-            ))}
-          </>
+          {paddedReserveTickets.map((ticket, index) => (
+            <QueueItem
+              key={index}
+              props={ticket || {}}
+              className={`${ticket.ticketno ? "" : "opacity-50"}`}
+              height="70px"
+              textSize="!text-3xl"
+              borderLine="pt-8"
+              counterCodeWidth="w-auto"
+              hideSectionTitle
+              blinkingTicket={`${
+                ticket?.ticketno === blinkingTicket ? "blinking" : ""
+              }`}
+            />
+          ))}
         </div>
       )}
 

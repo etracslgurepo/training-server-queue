@@ -43,7 +43,7 @@ const Video: React.FC<VideoProps> = ({
   // const rowHeight = layoutType === "standard" ? 144 : 122;
 
 const parsedRowCount = Number(rowCount) || 1;
-const rowHeight = layoutType === "standard" ? 144 : 122;
+const rowHeight = layoutType === "standard" ? 146 : 110;
 const videoHeight = `${parsedRowCount * rowHeight}px`;
 
 
@@ -235,13 +235,13 @@ useEffect(() => {
           <div className="w-full" style={{ height: videoHeight }}>
             {renderVideoElement()}
           </div>
-          <div className="bg-white h-[70px] flex items-center justify-between px-20">
+          <div className="bg-white h-[65px] flex items-center justify-between px-20">
             <TimeDate componentType={undefined} />
             <div className="relative -top-[10px]">
               <Weather layout="layout-2" />
             </div>
           </div>
-          <div className="bg-gray-200 h-[60px] rounded-b-md flex items-center justify-around px-10 relative">
+          <div className="bg-gray-200 h-[55px] rounded-b-md flex items-center justify-around px-10 relative">
             <div className="absolute overflow-hidden w-full">
               <SlideMessage
                 message={message}

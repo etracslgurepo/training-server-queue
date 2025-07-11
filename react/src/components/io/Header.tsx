@@ -7,7 +7,7 @@ const Header = ({props, color, lgulogo, fontFamily}:{props: any, color?: string,
   return (
     <div
       id={props.componentType}
-      className="text-white text-center flex items-center justify-between px-5 py-1"
+      className="text-white text-center flex items-center justify-between px-5 py-[10px]"
       style={{
         backgroundColor: color,
         fontFamily: fontFamily
@@ -17,19 +17,18 @@ const Header = ({props, color, lgulogo, fontFamily}:{props: any, color?: string,
         <Image
           src={lgulogo || defaultLogo}
           alt={"etracs logo"}
-          width={0}
-          height={0}
-          style={{ width: 70, height: 70 }}
+          width={80}
+          height={80}
           priority
           unoptimized
           className="leading-none !p-0 !m-0"
         />
       </div>
       <div className="flex flex-col" style={{ fontFamily: props.fontfamily }}>
-        <Text className="uppercase text-[22px] leading-[20px]">
+        <Text className="uppercase text-[32px] leading-[40px]">
           {props.title}
         </Text>
-        <Text className="font-normal uppercase text-[18px] leading-[20px]">
+        <Text className="font-normal uppercase text-[24px] leading-[20px]">
           {props.lguname}
         </Text>
       </div>
