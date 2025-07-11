@@ -47,7 +47,8 @@
       "showReserveTicket": false,
       "showVideo": true,
       "videoUrl": [
-        "http://192.168.2.15:2180/videos/sample.mp4"
+        "http://192.168.2.15:2180/videos/sample.mp4",
+        "http://192.168.2.15:2180/videos/video-1.mp4"
       ],
       "videoposition": "main-left",
       "videoLayout": "standard",

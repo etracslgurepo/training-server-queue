@@ -65,7 +65,7 @@ const Window = () => {
                     name="windowposition"
                     winLabel="Window Position"
                   />
-                  <ToggleButton
+                  {/* <ToggleButton
                     isActive={groups.showReserveTicket}
                     onClick={toggleReserveTicket}
                     caption="Reserve Ticket Visibility"
@@ -74,7 +74,7 @@ const Window = () => {
                         ? "Hide ReserveTicket"
                         : "Show ReserveTicket"
                     }
-                  />
+                  /> */}
                 </div>
               </div>
   )

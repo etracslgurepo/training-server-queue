@@ -2,18 +2,10 @@
 
 import Sidebar from "@/components/templates/Sidebar";
 import Button from "@mui/material/Button";
-import ColorPicker from "@/components/ui/ColorPicker";
-import FontFamilyPicker from "@/components/ui/FontFamilyPicker";
-import InputBox from "@/components/ui/InputBox";
-import { VideoPosition, WindowPosition } from "@/components/ui/Position";
-import ToggleButton from "@/components/ui/ToggleButton";
-import ImageUpload from "@/components/ui/UploadImage";
-import XyAxis from "@/components/ui/XyAxis";
 import { useData } from "@/context/DataContext";
 import { lookupService } from "@/lib/client";
 import { ReactElement, useEffect, useState } from "react";
 import Text from "@/components/ui/Text";
-import VideoLayout from "@/components/ui/VideoLayout";
 import CircularProgress from "@mui/material/CircularProgress";
 import General from "@/components/settings/General";
 import Theme from "@/components/settings/modules/Theme";
