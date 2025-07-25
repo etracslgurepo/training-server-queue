@@ -1,7 +1,7 @@
 import React from "react";
 
 interface XyAxisSelectProps {
-  value: string;
+  value: string | undefined;
   onChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
   name: string;
   label?: string;

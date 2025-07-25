@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 
 interface ToggleButtonProps {
   text?: string;
-  isActive: boolean;
+  isActive: boolean | undefined;
   onClick: () => void;
   componentType?: string;
   className?: string | undefined;

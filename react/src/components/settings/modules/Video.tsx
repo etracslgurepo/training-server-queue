@@ -9,18 +9,9 @@ import { useData } from '@/context/DataContext';
 const Video = () => {
       const {
         groups,
-        handleSubmit,
-        handleChange,
         handleSelect,
         handlePositionChange,
-        handleBgSizeChange,
-        toggleReserveTicket,
         toggleVideo,
-        updateBgUrl,
-        removeBgUrl,
-        resetData,
-        setGroupId,
-        groupId,
         updateVideoUrls,
       } = useData();
 
@@ -35,7 +26,7 @@ const Video = () => {
 const heightClass = getHeightClass(groups.videoUrl?.length || 0);
 
   return (
-     <div className="border-r border-black/20">
+     <div className="border-r border-black/20 max-lg:border-r-0">
                 <div className="w-full text-center pt-5">
                   <Text className="inline-block font-semibold text-xl uppercase p-0 border-b-2 border-black/50">
                     Video
@@ -56,7 +47,7 @@ const heightClass = getHeightClass(groups.videoUrl?.length || 0);
                           name={`videoUrl[${index}]`}
                           value={url}
                           onChange={(e) => {
-                            const newLinks = [...groups.videoUrl];
+                            const newLinks = [...groups?.videoUrl];
                             newLinks[index] = e.target.value;
                             updateVideoUrls(newLinks);
                           }}
@@ -65,7 +56,7 @@ const heightClass = getHeightClass(groups.videoUrl?.length || 0);
                         <button
                           type="button"
                           onClick={() => {
-                            const updated = [...groups.videoUrl];
+                            const updated = [...groups?.videoUrl];
                             updated.splice(index, 1);
                             updateVideoUrls(updated);
                           }}

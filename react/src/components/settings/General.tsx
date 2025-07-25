@@ -24,7 +24,7 @@ const General = () => {
           imgUrl={general.logoUrl}
         />
       </div>
-      <div className="border-l border-b-2 border-black/20 = p-5 h-[350px] flex flex-col items-center justify-center gap-5">
+      <div className="border-l border-b-2 border-black/20 p-5 h-[350px] flex flex-col items-center justify-center gap-5">
         <InputBox
           label="LGU Name"
           name="lguname"

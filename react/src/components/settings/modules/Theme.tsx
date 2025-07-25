@@ -16,7 +16,7 @@ const Theme = () => {
 
 
   return (
-     <div className="border-r border-b-2 border-black/20">
+     <div className="border-r border-b-2 border-black/20 max-lg:border-r-0 ">
                 <div className="w-full text-center">
                   <Text className="inline-block font-semibold text-xl uppercase p-0 border-b-2 border-black/50">
                     Theme

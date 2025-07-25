@@ -107,38 +107,40 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children, groupId = 
   const [groups, setGroups] = useState<GroupData>(createDefaultGroup("tc"));
   const [general, setGeneral] = useState<GeneralData>(defaultGeneral);
   const [currentGroupId, setCurrentGroupId] = useState(groupId);
+  const [defaultTheme, setDefaultTheme] = useState<GroupData>(createDefaultGroup("default"));
 
   useEffect(() => {
     fetchData(currentGroupId);
   }, [currentGroupId]);
 
-  const fetchData = (groupId: string) => {
-    fetch("/api/data/getData")
-      .then((response) => response.json())
-      .then((data) => {
-        if (data.group) {
-          const groupData = data.group.find((g: GroupData) => g.id === groupId);
-     if (groupData) {
-  setGroups({
-    ...groupData,
-    videoUrl: Array.isArray(groupData.videoUrl)
-      ? groupData.videoUrl
-      : groupData.videoUrl
-      ? [groupData.videoUrl]
-      : [""],
-  });
-}
+  const fetchData = async (groupId: string) => {
+    try {
+      const res = await fetch("/api/data/getData", { cache: "no-store" });
+      const data = await res.json();
 
-        } else {
-          console.error("Groups data is undefined");
-        }
+      const fetchedDefaultTheme = data.defaultTheme || createDefaultGroup(groupId);
+      setDefaultTheme(fetchedDefaultTheme);
+      
+      const override = data.groups?.find((g: GroupData) => g.id === groupId) || {};
 
-        if (data.general) {
-          setGeneral(data.general);
-        }
-      })
-      .catch((error) => console.error("Error fetching data:", error));
+      const mergedGroup = {
+        ...fetchedDefaultTheme,
+        ...override,
+        id: groupId,
+        videoUrl: Array.isArray(override.videoUrl)
+          ? override.videoUrl
+          : override.videoUrl
+          ? [override.videoUrl]
+          : fetchedDefaultTheme.videoUrl,
+      };
+
+      setGroups(mergedGroup);
+      setGeneral(data.general || defaultGeneral);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    }
   };
+  
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = event.target;
@@ -205,25 +207,42 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children, groupId = 
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    
+    const isEqual = (a: any, b: any) => JSON.stringify(a) === JSON.stringify(b);
+
+    // Compare against the actual defaultTheme from the server, not the hardcoded one
+    const groupOverrides: Partial<GroupData> = { id: currentGroupId };
+    
+    // Only include properties that differ from defaultTheme
+    Object.entries(groups).forEach(([key, value]) => {
+      if (key !== "id" && !isEqual(defaultTheme[key as keyof GroupData], value)) {
+        (groupOverrides as any)[key] = value;
+      }
+    });
+
+    // Always send the complete group data - the backend will handle the cleanup
+    const completeGroupData = { ...groups };
+
     try {
-      const response = await fetch("/api/data/update", {
+      const res = await fetch("/api/data/update", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          group: groups,
-          general: general,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          groups: completeGroupData, // Send complete data
+          general 
         }),
       });
-      const result = await response.json();
-      if (response.ok) {
-        console.log("Updated data:", result);
+
+      const result = await res.json();
+      if (res.ok) {
+        console.log("Updated successfully");
+        // Refetch to get the cleaned up data
+        fetchData(currentGroupId);
       } else {
-        console.error("Error updating data:", result);
+        console.error("Update failed:", result);
       }
-    } catch (error) {
-      console.error("Error saving data:", error);
+    } catch (err) {
+      console.error("Submit error:", err);
     }
   };
 
@@ -284,8 +303,8 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children, groupId = 
   };
 
   const resetData = () => {
-    const defaultGroup = createDefaultGroup(currentGroupId);
-    setGroups(defaultGroup);
+    // Use the actual defaultTheme from server instead of hardcoded default
+    setGroups({ ...defaultTheme, id: currentGroupId });
     setGeneral({
       ...defaultGeneral,
       lguname: "",

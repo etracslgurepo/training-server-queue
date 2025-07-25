@@ -1,5 +1,6 @@
 import React from "react";
-import General from "../groups/General";
+import General from "../settings/General";
+
 
 
 interface MainContentProps {

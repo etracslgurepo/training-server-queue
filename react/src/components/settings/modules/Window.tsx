@@ -16,8 +16,8 @@ const Window = () => {
       } = useData();
       
   return (
-    <div className="border-l border-b-2 border-black/20">
-                <div className="w-full text-center">
+    <div className="border-l border-b-2 border-black/20 max-lg:border-l-0 max-lg:pt-5">
+                <div className="w-full text-center ">
                   <Text className="inline-block font-semibold text-xl uppercase p-0 border-b-2 border-black/50">
                     Window
                   </Text>

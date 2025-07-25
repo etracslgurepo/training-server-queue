@@ -88,11 +88,11 @@ const heightClass = getHeightClass(groups.videoUrl?.length || 0);
           }}
         >
           {groupId !== "gen" ? (
-            <div className="grid grid-cols-2 auto-cols-fr items-center w-full border border-black rounded mt-5 p-5">
+            <div className="grid grid-cols-2 max-lg:grid-cols-1 auto-cols-fr items-center w-full border border-black rounded mt-5 p-5">
               <Theme />
               <Window />
               <Video />
-              <div className="border-l h-full border-black/20">
+              <div className="border-l max-lg:border-none h-full border-black/20">
                 <div className="w-full text-center pt-5">
                   <Text className="inline-block font-semibold text-xl uppercase p-0 border-b-2  text-transparent">
                    {/* 4th cont title */} title

@@ -1,7 +1,7 @@
 import React from "react";
 
 interface MainPositionSelectProps {
-  value: string;
+  value: string | undefined;
   onChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
   name: string;
   vidLabel?: string;
