@@ -18,6 +18,7 @@ COPY . .
 # Build the Next.js app
 RUN npm run build
 
+RUN ls -la
 
 # ----------------------
 # Stage 2: Production
@@ -31,7 +32,7 @@ ENV NODE_ENV=production
 
 # Copy only necessary files from builder
 COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/next.config.js ./next.config.js
+COPY --from=builder /app/next.config.mjs ./next.config.mjs
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next ./.next
 
