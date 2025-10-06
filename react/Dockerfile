@@ -18,7 +18,6 @@ COPY . .
 # Build the Next.js app
 RUN npm run build
 
-RUN ls -la
 
 # ----------------------
 # Stage 2: Production
@@ -38,6 +37,8 @@ COPY --from=builder /app/.next ./.next
 
 # Install only production dependencies
 RUN npm install --omit=dev --frozen-lockfile
+
+RUN touch .env && touch .env.local
 
 # Expose Next.js default port
 EXPOSE 3000

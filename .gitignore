@@ -23,6 +23,7 @@ zzz-custom
 
 
 # dependencies
+/react/_custom
 /react/node_modules
 /react/.pnp
 /react/.pnp.js
