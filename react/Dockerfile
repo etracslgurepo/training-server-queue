@@ -32,8 +32,10 @@ ENV NODE_ENV=production
 # Copy only necessary files from builder
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/next.config.mjs ./next.config.mjs
+COPY --from=builder /app/connections.json ./connections.json
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/.env ./.env
 
 # Install only production dependencies
 RUN npm install --omit=dev --frozen-lockfile
@@ -44,8 +46,8 @@ RUN touch .env && touch .env.local
 EXPOSE 3000
 
 # Run as non-root user for security
-RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001 -G nodejs
-USER nextjs
+#RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001 -G nodejs
+#USER nextjs
 
 # Run the Next.js server
 CMD ["npm", "start"]

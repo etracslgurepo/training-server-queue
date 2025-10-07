@@ -38,6 +38,9 @@ export default function handler(req, res) {
       return cleanedGroup;
     };
 
+    if ( existingData.groups == null ) existingData.groups = [];
+    if ( existingData.defaultTheme == null ) existingData.defaultTheme = {};
+
     // Special case: if group id is 'gen', remove it
     if (incomingGroup.id === "gen") {
       existingData.groups = existingData.groups.filter((g) => g.id !== "gen");

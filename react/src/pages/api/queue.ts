@@ -52,7 +52,7 @@ export default async function handler(
     }
 
     try {
-      const result = await axios.post(`${process.env.NEXT_PUBLIC_SOCKETIO_SERVER_IP}/send`, {
+      const result = await axios.post(`${process.env.NEXT_PUBLIC_SOCKETIO_SERVER_HOST}/send`, {
         channelid: groupid,
         message: body,
       });

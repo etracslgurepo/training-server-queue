@@ -12,7 +12,7 @@ export const useQueueSocket = ({ group, onUpdate }: Props) => {
   useEffect(() => {
     if (!group) return;
 
-    const socket = io(`${process.env.NEXT_PUBLIC_SOCKETIO_SERVER_IP}`);
+    const socket = io(`${process.env.NEXT_PUBLIC_SOCKETIO_SERVER_HOST}`);
     socketRef.current = socket;
 
     socket.on("connect", () => {

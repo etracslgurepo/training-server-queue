@@ -1,0 +1,26 @@
+version: "3"
+
+networks:
+   etracs_docker_network:
+      external: true
+
+
+services:
+
+  queue-server-react:
+    container_name: queue-server-react
+    image: ramesesinc/queue-server:2.5.03.01
+    networks:
+      - etracs_docker_network
+    restart: always
+    logging: 
+      driver: "json-file"
+      options:
+        max-file: "5"
+        max-size: "10m"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../_custom/data:/app/public/_custom
+      - ../_custom/env.conf:/app/.env.local
+      - ../_custom/connections.json:/app/connections.json
