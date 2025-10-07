@@ -1,0 +1,26 @@
+{
+  "groups": [],
+  "defaultTheme": {
+    "id": "default",
+    "color": "#335F96",
+    "showReserveTicket": false,
+    "showVideo": true,
+    "videoUrl": ["/videos/sample.mp4"],
+    "videoposition": "main-left",
+    "videoLayout": "standard",
+    "windowposition": "main-right",
+    "xyAxis": "vertical",
+    "rowCount": "3",
+    "columnCount": "1",
+    "bgUrl": "",
+    "bgSize": "auto",
+    "windowCount": "3"
+  },
+  "general": {
+    "logoUrl": "/images/lgu-logo.png",
+    "fontFamily": "Arial",
+    "lguname": "Puerto Princessa City",
+    "slidemessage": "",
+    "buzz": "/sound/take_number_sound.mp3"
+  }
+}
