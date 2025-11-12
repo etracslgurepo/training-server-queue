@@ -32,19 +32,28 @@ export default function handler(req, res) {
       return res.status(400).json({ error: "Missing group id." });
     }
 
-    const filePath = path.join(process.cwd(), "public", "_custom", "data.json");
+    const dirPath = path.join(process.cwd(), "public", "_custom");
+    const dataPath = path.join(dirPath, "data.json");
+    const templatePath = path.join(process.cwd(), "src", "pages", "api", "data", "template.json");
 
-    console.log("filePath", filePath)
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath, { recursive: true });
+    }
 
     let existingData = {};
-    if (fs.existsSync(filePath)) {
-      let text = fs.readFileSync(filePath, "utf-8");
+    if (fs.existsSync(dataPath)) {
+      let text = fs.readFileSync(dataPath, "utf-8");
       text = text.trim();
-
-      if (text.startsWith("{" && text.endsWith("}"))) {
+      if (text.startsWith("{") && text.endsWith("}")) {
         existingData = JSON.parse(text);
       }
-
+    } else if (fs.existsSync(templatePath)) {
+      const tplText = (fs.readFileSync(templatePath, "utf-8") ?? "").trim();
+      if (tplText.startsWith("{") && tplText.endsWith("}")) {
+        existingData = JSON.parse(tplText);
+        // Create data.json on first update with template contents
+        fs.writeFileSync(dataPath, JSON.stringify(existingData));
+      }
     }
 
     const isEqual = (a, b) => {
@@ -69,7 +78,7 @@ export default function handler(req, res) {
 
     if (existingData.groups == null) existingData.groups = [];
     if (existingData.defaultTheme == null) existingData.defaultTheme = basicTheme;
-     if (Object.keys(existingData.defaultTheme).length === 0 ) existingData.defaultTheme = basicTheme;
+    if (Object.keys(existingData.defaultTheme).length === 0 ) existingData.defaultTheme = basicTheme;
 
     // Special case: if group id is 'gen', remove it
     if (incomingGroup.id === "gen") {
@@ -143,9 +152,9 @@ export default function handler(req, res) {
     existingData.groups = existingData.groups
       .map((group) => removeDefaultProperties(group, existingData.defaultTheme))
       .filter((group) => Object.keys(group).length > 1); // Remove groups with only id
-    
-      console.log("existingData ===>", existingData)
-    fs.writeFileSync(filePath, JSON.stringify(existingData));
+
+    console.log("existingData ===>", existingData)
+    fs.writeFileSync(dataPath, JSON.stringify(existingData));
     return res.status(200).json({ message: "Group changes applied." });
   } catch (error) {
     console.error("Error updating group:", error);

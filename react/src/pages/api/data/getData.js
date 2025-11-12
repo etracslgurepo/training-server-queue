@@ -5,17 +5,25 @@ import path from "path";
 
 export default function handler(req, res) {
   try {
-    const filePath = path.join(process.cwd(), "public", "_custom", "data.json");
+    const dataPath = path.join(process.cwd(), "public", "_custom", "data.json");
+    const templatePath = path.join(process.cwd(), "src", "pages", "api", "data", "template.json");
+
     let text = "";
-    if (fs.existsSync(filePath)) {
-      text = fs.readFileSync(filePath, "utf-8") ?? "";
-      text = text.trim();
+    if (fs.existsSync(dataPath)) {
+      text = (fs.readFileSync(dataPath, "utf-8") ?? "").trim();
     }
 
     if (text.startsWith("{") && text.endsWith("}")) {
       const parsedData = JSON.parse(text);
-      console.log("parsedData ===>", parsedData)
       res.status(200).json(parsedData);
+    } else if (fs.existsSync(templatePath)) {
+      const tplText = (fs.readFileSync(templatePath, "utf-8") ?? "").trim();
+      if (tplText.startsWith("{") && tplText.endsWith("}")) {
+        const parsedTemplate = JSON.parse(tplText);
+        res.status(200).json(parsedTemplate);
+      } else {
+        res.status(200).json({});
+      }
     } else {
       res.status(200).json({});
     }

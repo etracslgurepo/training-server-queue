@@ -31,15 +31,19 @@ export const getQueueGroup = async () => {
   const svc = Service.lookup("QueueGroupService", "etracs");
   const groups = await svc.invoke("getGroupsWithSections", null);
 
+  groups.forEach((group: any) => {
+    group.name = group.objid;
+  });
+
   const general = {
     objid: "GEN",
+    name: "Global Config",
     title: "GENERAL",
   };
   const groupsdata: Record<string, any>[] = [
     general,       // Put general first, or wherever you want
     ...(groups || []) // Spread the actual group array
   ];
-
 
   return groupsdata;
 };

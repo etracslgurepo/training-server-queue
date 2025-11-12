@@ -19,7 +19,7 @@
   "general": {
     "logoUrl": "/images/lgu-logo.png",
     "fontFamily": "Arial",
-    "lguname": "Puerto Princessa City",
+    "lguname": "",
     "slidemessage": "",
     "buzz": "/sound/take_number_sound.mp3"
   }
