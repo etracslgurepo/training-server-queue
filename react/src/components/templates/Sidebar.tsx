@@ -6,13 +6,21 @@ import Text from "@/components/ui/Text";
 interface SidebarProps {
   onItemClick: (item: ReactElement) => void;
   items: Record<string, any>[];
-  handleGroupChange: (groupId: string) => void;  // Pass groupId on click
+  handleGroupChange: (groupId: string) => void; // Pass groupId on click
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ onItemClick, items, handleGroupChange }) => {
+const Sidebar: React.FC<SidebarProps> = ({
+  onItemClick,
+  items,
+  handleGroupChange,
+}) => {
   const [selectedItem, setSelectedItem] = useState<string | null>("GENERAL");
 
-  const handleItemClick = (component: ReactElement, title: string, groupId: string) => {
+  const handleItemClick = (
+    component: ReactElement,
+    title: string,
+    groupId: string
+  ) => {
     setSelectedItem(title);
     handleGroupChange(groupId); // Pass selected groupId when item is clicked
     onItemClick(component);
@@ -24,11 +32,29 @@ const Sidebar: React.FC<SidebarProps> = ({ onItemClick, items, handleGroupChange
       <div className="w-full flex flex-col gap-3">
         {items.map((item, index) => (
           <div key={index} className="uppercase">
-            <div
-              onClick={() => handleItemClick(item.objid, item.title, item.objid.toLowerCase())}
-              className={`pl-5 cursor-pointer flex gap-4 items-center text-xl py-2 ${selectedItem === item.title ? "bg-sky-200 mx-6 transition-all duration-200 ease-in rounded-lg" : "underline-hover"}`}
-            >
-              {item.objid}
+            <div className="relative group">
+              <div
+                onClick={() =>
+                  handleItemClick(
+                    item.objid,
+                    item.title,
+                    item.objid.toLowerCase()
+                  )
+                }
+                className={`pl-5 cursor-pointer flex gap-4 items-center text-xl py-2 ${
+                  selectedItem === item.title
+                    ? "bg-sky-200 mx-6 transition-all duration-200 ease-in rounded-lg"
+                    : "underline-hover"
+                }`}
+              >
+                {item.name}
+              </div>
+              <div
+                className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 whitespace-nowrap rounded bg-black px-2 py-1 text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity duration-100"
+                role="tooltip"
+              >
+                {item.title}
+              </div>
             </div>
           </div>
         ))}
