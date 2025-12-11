@@ -166,14 +166,22 @@ class UserQueueService {
 		if ( !o.counterid ) throw new Exception('counterid parameter is required'); 
 
 		def rundate = dateSvc.getServerDate();
-		def m = qnc.find([ counterid: o.counterid ]).first(); 
-		qn.find([ objid: m.objid ]).update([ state: 'SKIP' ]); 
-		qnc.find([ objid: m.objid ]).delete(); 
-		qna.find([ objid: m.objid ]).update([ 
-			servedby: [ objid: env.USERID, name: env.FULLNAME ], 
-			counter: qc.find([ objid: o.counterid ]).first(), 
-			state: 'SKIP', enddate: rundate 
-		]); 
+
+		qnc.getListByCounterid( o ).each{ nc-> 
+			qn.find([ objid: nc.objid ]).update([ state: 'SKIP' ]); 
+			qnc.find([ objid: nc.objid ]).delete(); 
+			qna.find([ objid: nc.objid ]).update([ 
+				servedby: [ objid: env.USERID, name: env.FULLNAME ], 
+				counter: qc.find([ objid: nc.counterid ]).first(), 
+				state: 'SKIP', enddate: rundate 
+			]); 
+
+			notify([ 
+				counterid: nc.counterid, sectionid: nc.sectionid, groupid: nc.groupid, 
+				seriesno: nc.seriesno, ticketno: nc.ticketno, prefix: nc.prefix, 
+				type:'SKIP_NUMBER', countercode: nc.code, sectiontitle: nc.title 
+			]); 		
+		}
 	} 
 
 	@ProxyMethod 
