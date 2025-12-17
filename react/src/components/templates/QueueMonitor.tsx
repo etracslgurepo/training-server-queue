@@ -94,7 +94,6 @@ const QueueMonitor = ({ group }: QueueMonitorProps) => {
   useQueueSocket({
     group,
     onUpdate: async (data) => {
-        console.log("data.type", data)
       if (data.type === "TAKE_NUMBER") {
         setTicketInfo((prev) => [data, ...prev]); // 🆕 Show ticket immediately in UI
         setTicketQueue((prevQueue) => [...prevQueue, data]); // 🔁 Queue for speech + blinking
