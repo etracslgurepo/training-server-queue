@@ -16,7 +16,8 @@ const QueueMonitor = ({ group }: QueueMonitorProps) => {
   const [data, setData] = useState<Record<string, any>>({});
   const [ticketQueue, setTicketQueue] = useState<any[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const { blinkingTicket, ticketInfo, setTicketInfo, setBlinkingTicket}= useQueueTicket();
+  const { blinkingTicket, ticketInfo, setTicketInfo, setBlinkingTicket } =
+    useQueueTicket();
   const { groups, general } = useData();
   const svc = lookupService("QueueService");
 
@@ -93,29 +94,37 @@ const QueueMonitor = ({ group }: QueueMonitorProps) => {
   useQueueSocket({
     group,
     onUpdate: async (data) => {
+        console.log("data.type", data.type)
       if (data.type === "TAKE_NUMBER") {
         setTicketInfo((prev) => [data, ...prev]); // 🆕 Show ticket immediately in UI
         setTicketQueue((prevQueue) => [...prevQueue, data]); // 🔁 Queue for speech + blinking
         // setTicketQueue((prevQueue) => [...prevQueue, data]);
       } else if (data.type === "BUZZ_NUMBER") {
         // Process buzz and text-to-speech immediately
-     await playBuzz();
-  await setBlinkingTicket(data.ticketno);
+        await playBuzz();
+        await setBlinkingTicket(data.ticketno);
 
-  // ✅ Start blink timeout immediately (not after TTS)
-  setTimeout(() => {
-    setBlinkingTicket(null);
-  }, 5000);
+        // ✅ Start blink timeout immediately (not after TTS)
+        setTimeout(() => {
+          setBlinkingTicket(null);
+        }, 5000);
 
-  await textToSpeech(data.countercode, data.ticketno);
+        await textToSpeech(data.countercode, data.ticketno);
       } else if (data.type === "CONSUME_NUMBER") {
         // Remove consumed ticket from the active list
         setTicketInfo((prevTickets) =>
           prevTickets.filter((ticket) => ticket.ticketno !== data.ticketno)
         );
+      } else if (data.type === "SKIP_NUMBER") {
+        // Remove skip ticket from the active list
+        setTicketInfo((prevTickets) =>
+          prevTickets.filter((ticket) => ticket.ticketno !== data.ticketno)
+        );
       }
     },
-  });
+  }); 
+
+
 
   const isVideoLeft = groups.videoposition === "main-left";
   const isQueueGroupRight = groups.windowposition === "main-right";
@@ -174,7 +183,7 @@ const QueueMonitor = ({ group }: QueueMonitorProps) => {
               componentType={
                 groups.showVideo ? `${groups.videoposition}` : "none"
               }
-                   videoLinks={groups.videoUrl}
+              videoLinks={groups.videoUrl}
               layoutType={groups.videoLayout}
               rowCount={groups.rowCount}
             />
